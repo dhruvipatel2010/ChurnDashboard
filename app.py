@@ -8,6 +8,25 @@ from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 from tensorflow.keras.models import load_model
 
+st.markdown("""
+<style>
+body {
+    background-color: #0E1117;
+}
+h1 {
+    color: #8B0000;
+    text-align: center;
+}
+.stButton>button {
+    background-color: #8B0000;
+    color: white;
+    border-radius: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+
 st.title("Customer Churn Prediction Dashboard")
 
 model = load_model("churn_model.h5")
@@ -49,4 +68,5 @@ if uploaded_file is not None:
     ax2.plot(fpr, tpr)
     ax2.plot([0,1],[0,1],'r--')
     ax2.set_title(f"AUC = {roc_auc:.2f}")
+
     st.pyplot(fig2)
