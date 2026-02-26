@@ -1,12 +1,11 @@
 # -------------------------------
-# STREAMLIT ML DASHBOARD — MULTIPLE CSV
+# FLEXIBLE STREAMLIT ML DASHBOARD — ANY CSV
 # -------------------------------
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-import json
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.metrics import confusion_matrix, roc_curve, auc
@@ -15,25 +14,23 @@ from tensorflow.keras.models import load_model
 # -------------------------------
 # PAGE CONFIG
 # -------------------------------
-st.set_page_config(page_title="ML Prediction Dashboard", layout="wide")
-st.title("📊 ML Prediction Dashboard — Multi-CSV Friendly")
+st.set_page_config(page_title="Flexible ML Dashboard", layout="wide")
+st.title("📊 Flexible ML Prediction Dashboard — Multi-CSV Friendly")
 
 sns.set_theme(style="whitegrid")
 colors = ["#FF4C4C", "#4285F4", "#0F9D58", "#F4B400", "#AB47BC"]
 
 # -------------------------------
-# LOAD MODEL & EXPECTED FEATURES
+# LOAD MODEL
 # -------------------------------
 try:
     model = load_model("churn_model.h5")
-    with open("model_features.json", "r") as f:
-        expected_features = json.load(f)
 except Exception as e:
-    st.warning("⚠️ Model or 'model_features.json' not found. Upload both files in same folder.")
+    st.warning("⚠️ Model file 'churn_model.h5' not found. Upload your trained model in the same folder.")
     st.stop()
 
 # -------------------------------
-# MULTIPLE FILE UPLOADER
+# MULTIPLE CSV UPLOADER
 # -------------------------------
 uploaded_files = st.file_uploader("Upload one or more CSV files", type=["csv"], accept_multiple_files=True)
 
@@ -49,27 +46,29 @@ if uploaded_files:
         st.subheader("Dataset Preview")
         st.dataframe(data.head())
 
-        target_column = st.selectbox(f"Choose target column for {file.name}", data.columns, key=file.name)
+        # -------------------------------
+        # AUTO-DETECT TARGET COLUMN
+        # -------------------------------
+        # If any binary column (0/1 or True/False) exists, pick first one
+        binary_cols = [col for col in data.columns if sorted(data[col].dropna().unique()) == [0,1] or sorted(data[col].dropna().unique()) == [0,1]]
+        if binary_cols:
+            target_column = binary_cols[0]
+            st.info(f"Auto-selected target column: {target_column}")
+        else:
+            target_column = st.selectbox(f"Choose target column for {file.name}", data.columns, key=file.name)
 
         # -------------------------------
-        # Align features with model
+        # DYNAMIC FEATURE SELECTION
         # -------------------------------
-        missing_features = [f for f in expected_features if f not in data.columns]
-        extra_features = [f for f in data.columns if f not in expected_features + [target_column]]
+        feature_cols = [col for col in data.columns if col != target_column]
 
-        if missing_features:
-            st.warning(f"Missing features (will fill with 0): {missing_features}")
-            for f in missing_features:
-                data[f] = 0  # Fill missing features
-
-        if extra_features:
-            st.info(f"Ignoring extra columns: {extra_features}")
-
-        # Keep only expected features
-        X = data[expected_features]
+        X = data[feature_cols].copy()
         y = data[target_column]
 
-        # Encode categorical
+        # Fill missing values
+        X = X.fillna(0)
+
+        # Encode categorical automatically
         le = LabelEncoder()
         for col in X.columns:
             if X[col].dtype == 'object':
@@ -167,4 +166,4 @@ if uploaded_files:
                 st.pyplot(fig9)
 
         except Exception as e:
-            st.error(f"Model prediction failed for {file.name}. Error: {e}")
+            st.error(f"❌ Model prediction failed for {file.name}. Error: {e}")
