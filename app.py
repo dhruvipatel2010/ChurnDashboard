@@ -1,5 +1,5 @@
 # -------------------------------
-# FLEXIBLE STREAMLIT ML DASHBOARD — ANY CSV
+# FLEXIBLE ML DASHBOARD — MULTI-CSV SAFE WITH ACCURACY
 # -------------------------------
 import streamlit as st
 import pandas as pd
@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.metrics import confusion_matrix, roc_curve, auc
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, roc_curve, auc
 from tensorflow.keras.models import load_model
 
 # -------------------------------
@@ -49,8 +49,7 @@ if uploaded_files:
         # -------------------------------
         # AUTO-DETECT TARGET COLUMN
         # -------------------------------
-        # If any binary column (0/1 or True/False) exists, pick first one
-        binary_cols = [col for col in data.columns if sorted(data[col].dropna().unique()) == [0,1] or sorted(data[col].dropna().unique()) == [0,1]]
+        binary_cols = [col for col in data.columns if sorted(data[col].dropna().unique()) == [0,1]]
         if binary_cols:
             target_column = binary_cols[0]
             st.info(f"Auto-selected target column: {target_column}")
@@ -61,7 +60,6 @@ if uploaded_files:
         # DYNAMIC FEATURE SELECTION
         # -------------------------------
         feature_cols = [col for col in data.columns if col != target_column]
-
         X = data[feature_cols].copy()
         y = data[target_column]
 
@@ -79,15 +77,35 @@ if uploaded_files:
         X_scaled = scaler.fit_transform(X)
 
         # -------------------------------
-        # MODEL PREDICTION
+        # DETECT TARGET TYPE
+        # -------------------------------
+        if len(y.unique()) == 2:
+            target_type = "binary"
+        else:
+            target_type = "multiclass"
+
+        # -------------------------------
+        # MODEL PREDICTION & DIAGRAMS
         # -------------------------------
         try:
             y_pred_prob = model.predict(X_scaled).flatten()
-            y_pred = (y_pred_prob > 0.5).astype(int)
 
-            cm = confusion_matrix(y, y_pred)
-            fpr, tpr, _ = roc_curve(y, y_pred_prob)
-            roc_auc = auc(fpr, tpr)
+            # Binary vs multiclass handling
+            if target_type == "binary":
+                y_pred = (y_pred_prob > 0.5).astype(int)
+            else:  # multiclass: take argmax across classes
+                y_pred = np.argmax(y_pred_prob.reshape(-1, len(y.unique())), axis=1)
+
+            # ----------------------
+            # METRICS
+            # ----------------------
+            accuracy = accuracy_score(y, y_pred)
+            f1 = f1_score(y, y_pred, average='weighted')
+
+            st.header("📌 Metrics")
+            col_acc, col_f1 = st.columns(2)
+            col_acc.metric("Accuracy", f"{accuracy*100:.2f}%")
+            col_f1.metric("F1 Score", f"{f1:.2f}")
 
             numeric_data = X.select_dtypes(include=[np.number]).fillna(0)
 
@@ -128,16 +146,21 @@ if uploaded_files:
             with col4:
                 st.subheader("Confusion Matrix")
                 fig4, ax4 = plt.subplots(figsize=(3,3))
-                sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax4)
+                sns.heatmap(confusion_matrix(y, y_pred, labels=y.unique()), annot=True, fmt="d", cmap="Blues", ax=ax4)
                 st.pyplot(fig4)
 
             with col5:
-                st.subheader("ROC Curve")
-                fig5, ax5 = plt.subplots(figsize=(3,3))
-                ax5.plot(fpr, tpr, color="#0F9D58")
-                ax5.plot([0,1],[0,1],'r--')
-                ax5.set_title(f"AUC = {roc_auc:.2f}")
-                st.pyplot(fig5)
+                if target_type == "binary":
+                    st.subheader("ROC Curve")
+                    fpr, tpr, _ = roc_curve(y, y_pred_prob)
+                    roc_auc = auc(fpr, tpr)
+                    fig5, ax5 = plt.subplots(figsize=(3,3))
+                    ax5.plot(fpr, tpr, color="#0F9D58")
+                    ax5.plot([0,1],[0,1],'r--')
+                    ax5.set_title(f"AUC = {roc_auc:.2f}")
+                    st.pyplot(fig5)
+                else:
+                    st.info("ROC curve skipped (multiclass target)")
 
             with col6:
                 st.subheader("Actual vs Predicted")
@@ -151,7 +174,7 @@ if uploaded_files:
             col7, col8, col9 = st.columns(3)
 
             with col7:
-                positive_rate = (y.sum() / len(y)) * 100 if y.sum() != 0 else 0
+                positive_rate = (y.sum() / len(y)) * 100 if target_type=="binary" else 0
                 st.metric("Positive Class %", f"{positive_rate:.2f}%")
 
             with col8:
