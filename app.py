@@ -6,12 +6,8 @@ import seaborn as sns
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.ensemble import RandomForestClassifier
-
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
-from tensorflow.keras.callbacks import EarlyStopping
 
 st.set_page_config(page_title="Complete AI Dashboard", layout="wide")
 
@@ -28,121 +24,111 @@ if uploaded_file is not None:
     categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
-    # ============================
-    # TABS
-    # ============================
     tab1, tab2, tab3 = st.tabs(["📊 Basic Diagrams", "📈 Advanced Diagrams", "🤖 Models"])
 
-    # ======================================
-    # TAB 1 → BASIC DIAGRAMS
-    # ======================================
+    # ==================================================
+    # TAB 1 → BASIC DIAGRAMS (3 ROW ALIGNMENT SMALL)
+    # ==================================================
     with tab1:
 
-        col1, col2 = st.columns(2)
+        st.subheader("📊 Basic Visualization Panel")
 
-        # PIE
-        with col1:
-            st.subheader("🥧 Pie Chart")
+        row1_col1, row1_col2, row1_col3 = st.columns(3)
+        row2_col1, row2_col2, row2_col3 = st.columns(3)
+        row3_col1, row3_col2, row3_col3 = st.columns(3)
+
+        # ================= Row 1 =================
+        with row1_col1:
             if categorical_cols:
+                st.caption("🥧 Pie Chart")
                 col_pie = st.selectbox("Pie Column", categorical_cols, key="pie")
                 values = df[col_pie].value_counts()
-                fig1, ax1 = plt.subplots(figsize=(5,5))
-                ax1.pie(values, labels=values.index, autopct='%1.1f%%')
-                st.pyplot(fig1)
+                fig, ax = plt.subplots(figsize=(3,3))
+                ax.pie(values, labels=None, autopct='%1.1f%%')
+                st.pyplot(fig)
 
-        # DONUT
-        with col2:
-            st.subheader("🍩 Donut Chart")
+        with row1_col2:
             if categorical_cols:
+                st.caption("🍩 Donut Chart")
                 col_donut = st.selectbox("Donut Column", categorical_cols, key="donut")
                 values2 = df[col_donut].value_counts()
-                fig2, ax2 = plt.subplots(figsize=(5,5))
-                ax2.pie(values2, labels=values2.index, autopct='%1.1f%%')
+                fig, ax = plt.subplots(figsize=(3,3))
+                ax.pie(values2, labels=None, autopct='%1.1f%%')
                 centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-                fig2.gca().add_artist(centre_circle)
-                st.pyplot(fig2)
+                fig.gca().add_artist(centre_circle)
+                st.pyplot(fig)
 
-        # =============================
-        # 🆕 3D STYLE PIE (NEW ADDED)
-        # =============================
-        st.subheader("🎨 3D Style Pie Chart")
-
-        if categorical_cols:
-            col_3d = st.selectbox("3D Pie Column", categorical_cols, key="3d_pie")
-            values3d = df[col_3d].value_counts()
-
-            explode = [0.05] * len(values3d)
-
-            fig3d, ax3d = plt.subplots(figsize=(6,5))
-            ax3d.pie(
-                values3d,
-                labels=values3d.index,
-                autopct='%1.1f%%',
-                shadow=True,
-                explode=explode
-            )
-            ax3d.set_title("3D Effect Pie Chart")
-            st.pyplot(fig3d)
-
-        col3, col4 = st.columns(2)
-
-        # HISTOGRAM
-        with col3:
-            st.subheader("📊 Histogram")
-            if numeric_cols:
-                col_hist = st.selectbox("Histogram Column", numeric_cols, key="hist")
-                fig3, ax3 = plt.subplots(figsize=(6,4))
-                sns.histplot(df[col_hist], kde=True, ax=ax3)
-                st.pyplot(fig3)
-
-        # BOX
-        with col4:
-            st.subheader("📦 Box Plot")
-            if numeric_cols:
-                col_box = st.selectbox("Box Column", numeric_cols, key="box")
-                fig4, ax4 = plt.subplots(figsize=(6,4))
-                sns.boxplot(y=df[col_box], ax=ax4)
-                st.pyplot(fig4)
-
-    # ======================================
-    # TAB 2 → ADVANCED DIAGRAMS
-    # ======================================
-    with tab2:
-
-        col5, col6 = st.columns(2)
-
-        # LINE
-        with col5:
-            st.subheader("📈 Line Chart")
-            if numeric_cols:
-                col_line = st.selectbox("Line Column", numeric_cols, key="line")
-                st.line_chart(df[col_line])
-
-        # CIRCULAR BAR
-        with col6:
-            st.subheader("🌀 Circular Bar Plot")
+        with row1_col3:
             if categorical_cols:
+                st.caption("🎨 3D Pie Chart")
+                col_3d = st.selectbox("3D Pie Column", categorical_cols, key="3d_pie")
+                values3d = df[col_3d].value_counts()
+                explode = [0.05] * len(values3d)
+                fig, ax = plt.subplots(figsize=(3,3))
+                ax.pie(values3d, autopct='%1.1f%%', shadow=True, explode=explode)
+                st.pyplot(fig)
+
+        # ================= Row 2 =================
+        with row2_col1:
+            if numeric_cols:
+                st.caption("📊 Histogram")
+                col_hist = st.selectbox("Histogram Column", numeric_cols, key="hist")
+                fig, ax = plt.subplots(figsize=(3,3))
+                sns.histplot(df[col_hist], kde=True, ax=ax)
+                st.pyplot(fig)
+
+        with row2_col2:
+            if numeric_cols:
+                st.caption("📦 Box Plot")
+                col_box = st.selectbox("Box Column", numeric_cols, key="box")
+                fig, ax = plt.subplots(figsize=(3,3))
+                sns.boxplot(y=df[col_box], ax=ax)
+                st.pyplot(fig)
+
+        with row2_col3:
+            if numeric_cols:
+                st.caption("📈 Line Chart")
+                col_line = st.selectbox("Line Column", numeric_cols, key="line_basic")
+                fig, ax = plt.subplots(figsize=(3,3))
+                ax.plot(df[col_line])
+                st.pyplot(fig)
+
+        # ================= Row 3 =================
+        with row3_col1:
+            if categorical_cols:
+                st.caption("🌀 Circular Bar")
                 col_circ = st.selectbox("Circular Column", categorical_cols, key="circular")
                 values4 = df[col_circ].value_counts()
                 angles = np.linspace(0, 2*np.pi, len(values4), endpoint=False)
+                fig = plt.figure(figsize=(3,3))
+                ax = fig.add_subplot(111, polar=True)
+                ax.bar(angles, values4.values)
+                st.pyplot(fig)
 
-                fig6 = plt.figure(figsize=(5,5))
-                ax6 = fig6.add_subplot(111, polar=True)
-                ax6.bar(angles, values4.values)
-                ax6.set_xticks(angles)
-                ax6.set_xticklabels(values4.index)
-                st.pyplot(fig6)
+        with row3_col2:
+            if len(numeric_cols) > 1:
+                st.caption("🔥 Heatmap")
+                fig, ax = plt.subplots(figsize=(3,3))
+                sns.heatmap(df[numeric_cols].corr(), annot=False, cmap="coolwarm", ax=ax)
+                st.pyplot(fig)
 
-        # HEATMAP
-        st.subheader("🔥 Correlation Heatmap")
+        with row3_col3:
+            st.caption("📊 Data Summary")
+            st.write(df.describe())
+
+    # ==================================================
+    # TAB 2 → ADVANCED (UNCHANGED CLEAN)
+    # ==================================================
+    with tab2:
+        st.subheader("📈 Advanced Analysis")
         if len(numeric_cols) > 1:
-            fig7, ax7 = plt.subplots(figsize=(6,5))
-            sns.heatmap(df[numeric_cols].corr(), annot=True, cmap="coolwarm", ax=ax7)
-            st.pyplot(fig7)
+            fig, ax = plt.subplots(figsize=(5,4))
+            sns.pairplot(df[numeric_cols])
+            st.pyplot(fig)
 
-    # ======================================
-    # TAB 3 → MODELS
-    # ======================================
+    # ==================================================
+    # TAB 3 → MODEL
+    # ==================================================
     with tab3:
 
         st.subheader("🤖 Universal Smart Model")
@@ -153,7 +139,6 @@ if uploaded_file is not None:
 
             df_model = df.copy()
 
-            # Remove ID-like columns
             for col in df_model.columns:
                 if df_model[col].nunique() == len(df_model):
                     df_model.drop(columns=[col], inplace=True)
@@ -169,7 +154,6 @@ if uploaded_file is not None:
                     y = pd.factorize(y)[0]
 
                 X = pd.get_dummies(X)
-
                 scaler = StandardScaler()
                 X = scaler.fit_transform(X)
 
@@ -205,7 +189,7 @@ if uploaded_file is not None:
 
                 model.fit(
                     X_train, y_train,
-                    epochs=30,
+                    epochs=25,
                     validation_split=0.2,
                     verbose=0
                 )
