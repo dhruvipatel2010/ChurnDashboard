@@ -1,5 +1,5 @@
 # -------------------------------
-# FASHIONABLE FLEXIBLE ML DASHBOARD
+# FASHIONABLE FLEXIBLE ML DASHBOARD — FULLY SAFE
 # -------------------------------
 import streamlit as st
 import pandas as pd
@@ -27,13 +27,15 @@ try:
     model = load_model("churn_model.h5")
     model_input_features = 9  # Change if your model expects different input features
 except Exception as e:
-    st.warning("⚠️ Model file 'churn_model.h5' not found. Upload your trained model.")
-    st.stop()
+    st.warning("⚠️ Model file 'churn_model.h5' not found. Predictions will be skipped.")
+    model = None
 
 # -------------------------------
 # MULTIPLE CSV UPLOADER
 # -------------------------------
-uploaded_files = st.file_uploader("Upload one or more CSV files", type=["csv"], accept_multiple_files=True)
+uploaded_files = st.file_uploader(
+    "Upload one or more CSV files", type=["csv"], accept_multiple_files=True
+)
 
 if uploaded_files:
     for file in uploaded_files:
@@ -48,7 +50,7 @@ if uploaded_files:
         st.dataframe(data.head())
 
         # -------------------------------
-        # AUTO-DETECT TARGET COLUMN
+        # SELECT TARGET COLUMN
         # -------------------------------
         binary_cols = [col for col in data.columns if sorted(data[col].dropna().unique()) == [0,1]]
         if binary_cols:
@@ -58,7 +60,7 @@ if uploaded_files:
             target_column = st.selectbox(f"Choose target column for {file.name}", data.columns, key=file.name)
 
         # -------------------------------
-        # FEATURE SELECTION
+        # FEATURES PREPROCESSING
         # -------------------------------
         feature_cols = [col for col in data.columns if col != target_column]
         X = data[feature_cols].copy()
@@ -67,7 +69,7 @@ if uploaded_files:
         # Fill missing values
         X = X.fillna(0)
 
-        # Encode categorical automatically
+        # Encode categorical
         le = LabelEncoder()
         for col in X.columns:
             if X[col].dtype == 'object':
@@ -77,20 +79,17 @@ if uploaded_files:
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
 
-        # -------------------------------
-        # DETECT TARGET TYPE
-        # -------------------------------
+        # Detect target type
         if len(y.unique()) == 2:
             target_type = "binary"
         else:
             target_type = "multiclass"
 
         # -------------------------------
-        # SAFE DIAGRAMS (Always)
+        # ROW 1 — DATA INSIGHTS (Always)
         # -------------------------------
         numeric_data = X.select_dtypes(include=[np.number]).fillna(0)
 
-        # Row 1: Target dist, correlation, histogram
         st.header("📊 Row 1 — Data Insights")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -108,74 +107,88 @@ if uploaded_files:
             else:
                 st.warning("No numeric columns for correlation.")
         with col3:
-            st.subheader("Feature Histogram (first column)")
+            st.subheader("First Feature Histogram")
             if not numeric_data.empty:
                 fig3, ax3 = plt.subplots(figsize=(3,3))
                 sns.histplot(numeric_data[numeric_data.columns[0]], kde=True, color="#4285F4", ax=ax3)
                 st.pyplot(fig3)
 
         # -------------------------------
-        # MODEL PREDICTION (Safe)
+        # PREDICTION & SAFE DIAGRAMS
         # -------------------------------
-        if X_scaled.shape[1] != model_input_features:
-            st.warning(f"⚠️ CSV has {X_scaled.shape[1]} features, model expects {model_input_features}. Skipping predictions.")
-            continue
+        can_predict = model is not None and X_scaled.shape[1] == model_input_features
 
-        try:
-            y_pred_prob = model.predict(X_scaled).flatten()
-            if target_type=="binary":
-                y_pred = (y_pred_prob > 0.5).astype(int)
-            else:
-                y_pred = np.argmax(y_pred_prob.reshape(-1, len(y.unique())), axis=1)
+        if can_predict:
+            try:
+                y_pred_prob = model.predict(X_scaled).flatten()
+                if target_type=="binary":
+                    y_pred = (y_pred_prob > 0.5).astype(int)
+                else:
+                    y_pred = np.argmax(y_pred_prob.reshape(-1, len(y.unique())), axis=1)
 
-            # Metrics
-            accuracy = accuracy_score(y, y_pred)
-            f1 = f1_score(y, y_pred, average='weighted')
-            st.header("📌 Metrics")
-            col_acc, col_f1 = st.columns(2)
-            col_acc.metric("Accuracy", f"{accuracy*100:.2f}%")
-            col_f1.metric("F1 Score", f"{f1:.2f}")
+                # Metrics
+                accuracy = accuracy_score(y, y_pred)
+                f1 = f1_score(y, y_pred, average='weighted')
+                st.header("📌 Metrics")
+                col_acc, col_f1 = st.columns(2)
+                col_acc.metric("Accuracy", f"{accuracy*100:.2f}%")
+                col_f1.metric("F1 Score", f"{f1:.2f}")
 
-            # Row 2: Confusion matrix, ROC (binary only), actual vs predicted
-            st.header("🤖 Row 2 — Model Performance")
-            col4, col5, col6 = st.columns(3)
-            with col4:
-                st.subheader("Confusion Matrix")
+            except Exception as e:
+                st.error(f"❌ Model prediction failed for {file.name}. Error: {e}")
+                can_predict = False
+        else:
+            st.info("Predictions skipped (model missing or CSV feature mismatch).")
+
+        # -------------------------------
+        # ROW 2 — PERFORMANCE DIAGRAMS
+        # -------------------------------
+        st.header("🤖 Row 2 — Model Performance (if available)")
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.subheader("Confusion Matrix")
+            if can_predict:
                 fig4, ax4 = plt.subplots(figsize=(3,3))
                 sns.heatmap(confusion_matrix(y, y_pred, labels=y.unique()), annot=True, fmt="d", cmap="Blues", ax=ax4)
                 st.pyplot(fig4)
-            with col5:
-                if target_type=="binary":
-                    st.subheader("ROC Curve")
-                    fpr, tpr, _ = roc_curve(y, y_pred_prob)
-                    roc_auc = auc(fpr, tpr)
-                    fig5, ax5 = plt.subplots(figsize=(3,3))
-                    ax5.plot(fpr, tpr, color="#0F9D58")
-                    ax5.plot([0,1],[0,1],'r--')
-                    ax5.set_title(f"AUC = {roc_auc:.2f}")
-                    st.pyplot(fig5)
-                else:
-                    st.info("ROC curve skipped (multiclass target)")
-            with col6:
-                st.subheader("Actual vs Predicted")
+            else:
+                st.info("Confusion matrix not available.")
+
+        with col5:
+            st.subheader("ROC Curve")
+            if can_predict and target_type=="binary":
+                fpr, tpr, _ = roc_curve(y, y_pred_prob)
+                roc_auc = auc(fpr, tpr)
+                fig5, ax5 = plt.subplots(figsize=(3,3))
+                ax5.plot(fpr, tpr, color="#0F9D58")
+                ax5.plot([0,1],[0,1],'r--')
+                ax5.set_title(f"AUC = {roc_auc:.2f}")
+                st.pyplot(fig5)
+            else:
+                st.info("ROC curve not available.")
+
+        with col6:
+            st.subheader("Actual vs Predicted")
+            if can_predict:
                 comparison_df = pd.DataFrame({"Actual": y.values, "Predicted": y_pred})
                 st.dataframe(comparison_df.head())
+            else:
+                st.info("Actual vs Predicted table not available.")
 
-            # Row 3: Extra insights
-            st.header("📈 Row 3 — Extra Insights")
-            col7, col8, col9 = st.columns(3)
-            with col7:
-                positive_rate = (y.sum()/len(y))*100 if target_type=="binary" else 0
-                st.metric("Positive Class %", f"{positive_rate:.2f}%")
-            with col8:
-                st.metric("Total Records", len(data))
-            with col9:
-                if not X.empty:
-                    counts = X[X.columns[0]].value_counts()
-                    fig9, ax9 = plt.subplots(figsize=(3,3))
-                    ax9.bar(counts.index, counts.values, color="#F4B400")
-                    ax9.set_xticklabels(counts.index, rotation=45)
-                    st.pyplot(fig9)
-
-        except Exception as e:
-            st.error(f"❌ Model prediction failed for {file.name}. Error: {e}")
+        # -------------------------------
+        # ROW 3 — EXTRA INSIGHTS (Always)
+        # -------------------------------
+        st.header("📈 Row 3 — Extra Insights")
+        col7, col8, col9 = st.columns(3)
+        with col7:
+            positive_rate = (y.sum()/len(y))*100 if target_type=="binary" else 0
+            st.metric("Positive Class %", f"{positive_rate:.2f}%")
+        with col8:
+            st.metric("Total Records", len(data))
+        with col9:
+            if not X.empty:
+                counts = X[X.columns[0]].value_counts()
+                fig9, ax9 = plt.subplots(figsize=(3,3))
+                ax9.bar(counts.index, counts.values, color="#F4B400")
+                ax9.set_xticklabels(counts.index, rotation=45)
+                st.pyplot(fig9)
