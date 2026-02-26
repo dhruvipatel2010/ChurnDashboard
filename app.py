@@ -14,25 +14,8 @@ from tensorflow.keras.models import load_model
 st.set_page_config(page_title="Customer Churn Dashboard", layout="wide")
 
 # --------------------------------------------------
-# CUSTOM CSS
+# TITLE
 # --------------------------------------------------
-st.markdown("""
-<style>
-body {
-    background-color: #0E1117;
-}
-h1 {
-    color: #8B0000;
-    text-align: center;
-}
-.stButton>button {
-    background-color: #8B0000;
-    color: white;
-    border-radius: 10px;
-}
-</style>
-""", unsafe_allow_html=True)
-
 st.title("📊 Customer Churn Prediction Dashboard")
 
 # --------------------------------------------------
@@ -59,17 +42,33 @@ if uploaded_file is not None:
 
     col1, col2 = st.columns(2)
 
+    # --- Churn Distribution ---
     with col1:
-        st.subheader("Churn Distribution")
-        fig1, ax1 = plt.subplots()
-        sns.countplot(x="returned", data=data, ax=ax1)
-        st.pyplot(fig1)
+        if "returned" in data.columns:
+            st.subheader("Churn Distribution")
+            fig1, ax1 = plt.subplots()
+            sns.countplot(x="returned", data=data, ax=ax1)
+            st.pyplot(fig1)
 
+    # --- Correlation Heatmap (FIXED) ---
     with col2:
         st.subheader("Feature Correlation")
-        fig2, ax2 = plt.subplots(figsize=(6,4))
-        sns.heatmap(data.corr(), cmap="coolwarm", ax=ax2)
-        st.pyplot(fig2)
+
+        numeric_data = data.select_dtypes(include=[np.number]).fillna(0)
+
+        if not numeric_data.empty:
+            fig2, ax2 = plt.subplots(figsize=(6,4))
+            sns.heatmap(numeric_data.corr(), cmap="coolwarm", ax=ax2)
+            st.pyplot(fig2)
+        else:
+            st.warning("No numeric columns available for correlation heatmap.")
+
+    # --------------------------------------------------
+    # CHECK REQUIRED COLUMN
+    # --------------------------------------------------
+    if "returned" not in data.columns:
+        st.error("Column 'returned' not found in dataset.")
+        st.stop()
 
     # --------------------------------------------------
     # DATA PREPROCESSING
@@ -77,7 +76,9 @@ if uploaded_file is not None:
     le = LabelEncoder()
     for col in data.columns:
         if data[col].dtype == 'object':
-            data[col] = le.fit_transform(data[col])
+            data[col] = le.fit_transform(data[col].astype(str))
+
+    data = data.fillna(0)
 
     X = data.drop("returned", axis=1)
     y = data["returned"]
@@ -88,7 +89,7 @@ if uploaded_file is not None:
     # --------------------------------------------------
     # MODEL PREDICTION
     # --------------------------------------------------
-    y_pred_prob = model.predict(X_scaled)
+    y_pred_prob = model.predict(X_scaled).flatten()
     y_pred = (y_pred_prob > 0.5).astype(int)
 
     cm = confusion_matrix(y, y_pred)
@@ -103,12 +104,14 @@ if uploaded_file is not None:
 
     col3, col4 = st.columns(2)
 
+    # --- Confusion Matrix ---
     with col3:
         st.subheader("Confusion Matrix")
         fig3, ax3 = plt.subplots()
         sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax3)
         st.pyplot(fig3)
 
+    # --- ROC Curve ---
     with col4:
         st.subheader("ROC Curve")
         fig4, ax4 = plt.subplots()
@@ -124,12 +127,14 @@ if uploaded_file is not None:
 
     col5, col6 = st.columns(2)
 
+    # --- Probability Distribution ---
     with col5:
         st.subheader("Prediction Probability Distribution")
         fig5, ax5 = plt.subplots()
         sns.histplot(y_pred_prob, kde=True, ax=ax5)
         st.pyplot(fig5)
 
+    # --- Age Distribution if Exists ---
     with col6:
         if "age" in data.columns:
             st.subheader("Age Distribution by Churn")
