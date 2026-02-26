@@ -29,7 +29,7 @@ if uploaded_file is not None:
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
     # ============================
-    # TABS (Nothing will disappear)
+    # TABS
     # ============================
     tab1, tab2, tab3 = st.tabs(["📊 Basic Diagrams", "📈 Advanced Diagrams", "🤖 Models"])
 
@@ -61,6 +61,28 @@ if uploaded_file is not None:
                 centre_circle = plt.Circle((0, 0), 0.70, fc='white')
                 fig2.gca().add_artist(centre_circle)
                 st.pyplot(fig2)
+
+        # =============================
+        # 🆕 3D STYLE PIE (NEW ADDED)
+        # =============================
+        st.subheader("🎨 3D Style Pie Chart")
+
+        if categorical_cols:
+            col_3d = st.selectbox("3D Pie Column", categorical_cols, key="3d_pie")
+            values3d = df[col_3d].value_counts()
+
+            explode = [0.05] * len(values3d)
+
+            fig3d, ax3d = plt.subplots(figsize=(6,5))
+            ax3d.pie(
+                values3d,
+                labels=values3d.index,
+                autopct='%1.1f%%',
+                shadow=True,
+                explode=explode
+            )
+            ax3d.set_title("3D Effect Pie Chart")
+            st.pyplot(fig3d)
 
         col3, col4 = st.columns(2)
 
@@ -101,17 +123,17 @@ if uploaded_file is not None:
             st.subheader("🌀 Circular Bar Plot")
             if categorical_cols:
                 col_circ = st.selectbox("Circular Column", categorical_cols, key="circular")
-                values3 = df[col_circ].value_counts()
-                angles = np.linspace(0, 2*np.pi, len(values3), endpoint=False)
+                values4 = df[col_circ].value_counts()
+                angles = np.linspace(0, 2*np.pi, len(values4), endpoint=False)
 
                 fig6 = plt.figure(figsize=(5,5))
                 ax6 = fig6.add_subplot(111, polar=True)
-                ax6.bar(angles, values3.values)
+                ax6.bar(angles, values4.values)
                 ax6.set_xticks(angles)
-                ax6.set_xticklabels(values3.index)
+                ax6.set_xticklabels(values4.index)
                 st.pyplot(fig6)
 
-        # HEATMAP FULL WIDTH
+        # HEATMAP
         st.subheader("🔥 Correlation Heatmap")
         if len(numeric_cols) > 1:
             fig7, ax7 = plt.subplots(figsize=(6,5))
@@ -123,77 +145,74 @@ if uploaded_file is not None:
     # ======================================
     with tab3:
 
+        st.subheader("🤖 Universal Smart Model")
+
         target_col = st.selectbox("Select Target Column", df.columns)
 
-        # RANDOM FOREST
-        if st.button("Train Random Forest"):
+        if st.button("Train Model"):
 
-            X = df.drop(columns=[target_col])
-            y = df[target_col]
+            df_model = df.copy()
 
-            X = pd.get_dummies(X)
-            scaler = StandardScaler()
-            X = scaler.fit_transform(X)
+            # Remove ID-like columns
+            for col in df_model.columns:
+                if df_model[col].nunique() == len(df_model):
+                    df_model.drop(columns=[col], inplace=True)
 
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
-            )
+            if target_col not in df_model.columns:
+                st.error("Selected target looks like ID column.")
+            else:
 
-            model_rf = RandomForestClassifier()
-            model_rf.fit(X_train, y_train)
+                X = df_model.drop(columns=[target_col])
+                y = df_model[target_col]
 
-            preds = model_rf.predict(X_test)
-            acc = accuracy_score(y_test, preds)
+                if y.dtype == "object":
+                    y = pd.factorize(y)[0]
 
-            st.success(f"Random Forest Accuracy: {acc*100:.2f}%")
+                X = pd.get_dummies(X)
 
-            cm = confusion_matrix(y_test, preds)
-            fig8, ax8 = plt.subplots(figsize=(4,4))
-            sns.heatmap(cm, annot=True, fmt="d", ax=ax8)
-            st.pyplot(fig8)
+                scaler = StandardScaler()
+                X = scaler.fit_transform(X)
 
-        # DEEP LEARNING
-        if st.button("Train Deep Learning"):
+                X_train, X_test, y_train, y_test = train_test_split(
+                    X, y, test_size=0.2, random_state=42
+                )
 
-            X = df.drop(columns=[target_col])
-            y = df[target_col]
+                num_classes = len(np.unique(y))
 
-            X = pd.get_dummies(X)
-            scaler = StandardScaler()
-            X = scaler.fit_transform(X)
+                if num_classes == 2:
+                    output_units = 1
+                    activation = "sigmoid"
+                    loss_function = "binary_crossentropy"
+                else:
+                    output_units = num_classes
+                    activation = "softmax"
+                    loss_function = "sparse_categorical_crossentropy"
 
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.2, random_state=42
-            )
+                model = Sequential([
+                    Dense(128, activation='relu'),
+                    BatchNormalization(),
+                    Dropout(0.3),
+                    Dense(64, activation='relu'),
+                    Dropout(0.2),
+                    Dense(output_units, activation=activation)
+                ])
 
-            model = Sequential([
-                Dense(128, activation='relu'),
-                BatchNormalization(),
-                Dropout(0.3),
-                Dense(64, activation='relu'),
-                Dropout(0.2),
-                Dense(1, activation='sigmoid')
-            ])
+                model.compile(
+                    optimizer='adam',
+                    loss=loss_function,
+                    metrics=['accuracy']
+                )
 
-            model.compile(
-                optimizer='adam',
-                loss='binary_crossentropy',
-                metrics=['accuracy']
-            )
+                model.fit(
+                    X_train, y_train,
+                    epochs=30,
+                    validation_split=0.2,
+                    verbose=0
+                )
 
-            early_stop = EarlyStopping(patience=5, restore_best_weights=True)
+                loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
 
-            model.fit(
-                X_train, y_train,
-                epochs=50,
-                validation_split=0.2,
-                callbacks=[early_stop],
-                verbose=0
-            )
-
-            loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
-
-            st.success(f"Deep Learning Accuracy: {accuracy*100:.2f}%")
+                st.success(f"Model Accuracy: {accuracy*100:.2f}%")
 
 else:
-    st.info("Please upload a CSV file to start.")
+    st.info("Upload a CSV file to start.")
