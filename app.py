@@ -13,9 +13,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping
 
-st.set_page_config(page_title="Ultimate AI Dashboard", layout="wide")
+st.set_page_config(page_title="Complete AI Dashboard", layout="wide")
 
-st.title("🔥 Ultimate Universal AI Dashboard")
+st.title("🔥 Complete Universal AI Dashboard")
 
 uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
 
@@ -28,163 +28,172 @@ if uploaded_file is not None:
     categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
     numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
-    st.write("Categorical:", categorical_cols)
-    st.write("Numeric:", numeric_cols)
+    # ============================
+    # TABS (Nothing will disappear)
+    # ============================
+    tab1, tab2, tab3 = st.tabs(["📊 Basic Diagrams", "📈 Advanced Diagrams", "🤖 Models"])
 
-    # =============================
-    # ROW 1 → PIE + DONUT
-    # =============================
-    col1, col2 = st.columns(2)
+    # ======================================
+    # TAB 1 → BASIC DIAGRAMS
+    # ======================================
+    with tab1:
 
-    with col1:
-        st.subheader("🥧 Pie Chart")
-        if len(categorical_cols) > 0:
-            col_pie = st.selectbox("Pie Column", categorical_cols, key="pie")
-            values = df[col_pie].value_counts()
-            fig1, ax1 = plt.subplots(figsize=(5,5))
-            ax1.pie(values, labels=values.index, autopct='%1.1f%%')
-            st.pyplot(fig1)
+        col1, col2 = st.columns(2)
 
-    with col2:
-        st.subheader("🍩 Donut Chart")
-        if len(categorical_cols) > 0:
-            col_donut = st.selectbox("Donut Column", categorical_cols, key="donut")
-            values2 = df[col_donut].value_counts()
-            fig2, ax2 = plt.subplots(figsize=(5,5))
-            ax2.pie(values2, labels=values2.index, autopct='%1.1f%%')
-            centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-            fig2.gca().add_artist(centre_circle)
-            st.pyplot(fig2)
+        # PIE
+        with col1:
+            st.subheader("🥧 Pie Chart")
+            if categorical_cols:
+                col_pie = st.selectbox("Pie Column", categorical_cols, key="pie")
+                values = df[col_pie].value_counts()
+                fig1, ax1 = plt.subplots(figsize=(5,5))
+                ax1.pie(values, labels=values.index, autopct='%1.1f%%')
+                st.pyplot(fig1)
 
-    # =============================
-    # ROW 2 → HISTOGRAM + BOX
-    # =============================
-    col3, col4 = st.columns(2)
+        # DONUT
+        with col2:
+            st.subheader("🍩 Donut Chart")
+            if categorical_cols:
+                col_donut = st.selectbox("Donut Column", categorical_cols, key="donut")
+                values2 = df[col_donut].value_counts()
+                fig2, ax2 = plt.subplots(figsize=(5,5))
+                ax2.pie(values2, labels=values2.index, autopct='%1.1f%%')
+                centre_circle = plt.Circle((0, 0), 0.70, fc='white')
+                fig2.gca().add_artist(centre_circle)
+                st.pyplot(fig2)
 
-    with col3:
-        st.subheader("📊 Histogram")
-        if len(numeric_cols) > 0:
-            col_hist = st.selectbox("Histogram Column", numeric_cols, key="hist")
-            fig3, ax3 = plt.subplots(figsize=(6,4))
-            sns.histplot(df[col_hist], kde=True, ax=ax3)
-            st.pyplot(fig3)
+        col3, col4 = st.columns(2)
 
-    with col4:
-        st.subheader("📦 Box Plot")
-        if len(numeric_cols) > 0:
-            col_box = st.selectbox("Box Column", numeric_cols, key="box")
-            fig4, ax4 = plt.subplots(figsize=(6,4))
-            sns.boxplot(y=df[col_box], ax=ax4)
-            st.pyplot(fig4)
+        # HISTOGRAM
+        with col3:
+            st.subheader("📊 Histogram")
+            if numeric_cols:
+                col_hist = st.selectbox("Histogram Column", numeric_cols, key="hist")
+                fig3, ax3 = plt.subplots(figsize=(6,4))
+                sns.histplot(df[col_hist], kde=True, ax=ax3)
+                st.pyplot(fig3)
 
-    # =============================
-    # ROW 3 → LINE + CIRCULAR BAR
-    # =============================
-    col5, col6 = st.columns(2)
+        # BOX
+        with col4:
+            st.subheader("📦 Box Plot")
+            if numeric_cols:
+                col_box = st.selectbox("Box Column", numeric_cols, key="box")
+                fig4, ax4 = plt.subplots(figsize=(6,4))
+                sns.boxplot(y=df[col_box], ax=ax4)
+                st.pyplot(fig4)
 
-    with col5:
-        st.subheader("📈 Line Chart")
-        if len(numeric_cols) > 0:
-            col_line = st.selectbox("Line Column", numeric_cols, key="line")
-            st.line_chart(df[col_line])
+    # ======================================
+    # TAB 2 → ADVANCED DIAGRAMS
+    # ======================================
+    with tab2:
 
-    with col6:
-        st.subheader("🌀 Circular Bar Plot")
-        if len(categorical_cols) > 0:
-            col_circ = st.selectbox("Circular Column", categorical_cols, key="circular")
-            values3 = df[col_circ].value_counts()
-            angles = np.linspace(0, 2*np.pi, len(values3), endpoint=False)
-            fig6 = plt.figure(figsize=(5,5))
-            ax6 = fig6.add_subplot(111, polar=True)
-            ax6.bar(angles, values3.values)
-            ax6.set_xticks(angles)
-            ax6.set_xticklabels(values3.index)
-            st.pyplot(fig6)
+        col5, col6 = st.columns(2)
 
-    # =============================
-    # HEATMAP (FULL WIDTH)
-    # =============================
-    st.subheader("🔥 Correlation Heatmap")
-    if len(numeric_cols) > 1:
-        fig7, ax7 = plt.subplots(figsize=(6,5))
-        sns.heatmap(df[numeric_cols].corr(), annot=True, cmap="coolwarm", ax=ax7)
-        st.pyplot(fig7)
+        # LINE
+        with col5:
+            st.subheader("📈 Line Chart")
+            if numeric_cols:
+                col_line = st.selectbox("Line Column", numeric_cols, key="line")
+                st.line_chart(df[col_line])
 
-    # =============================
-    # MACHINE LEARNING
-    # =============================
-    st.subheader("🤖 Random Forest Model")
+        # CIRCULAR BAR
+        with col6:
+            st.subheader("🌀 Circular Bar Plot")
+            if categorical_cols:
+                col_circ = st.selectbox("Circular Column", categorical_cols, key="circular")
+                values3 = df[col_circ].value_counts()
+                angles = np.linspace(0, 2*np.pi, len(values3), endpoint=False)
 
-    target_col = st.selectbox("Select Target Column", df.columns)
+                fig6 = plt.figure(figsize=(5,5))
+                ax6 = fig6.add_subplot(111, polar=True)
+                ax6.bar(angles, values3.values)
+                ax6.set_xticks(angles)
+                ax6.set_xticklabels(values3.index)
+                st.pyplot(fig6)
 
-    if st.button("Train Random Forest"):
+        # HEATMAP FULL WIDTH
+        st.subheader("🔥 Correlation Heatmap")
+        if len(numeric_cols) > 1:
+            fig7, ax7 = plt.subplots(figsize=(6,5))
+            sns.heatmap(df[numeric_cols].corr(), annot=True, cmap="coolwarm", ax=ax7)
+            st.pyplot(fig7)
 
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+    # ======================================
+    # TAB 3 → MODELS
+    # ======================================
+    with tab3:
 
-        X = pd.get_dummies(X)
-        scaler = StandardScaler()
-        X = scaler.fit_transform(X)
+        target_col = st.selectbox("Select Target Column", df.columns)
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+        # RANDOM FOREST
+        if st.button("Train Random Forest"):
 
-        model_rf = RandomForestClassifier()
-        model_rf.fit(X_train, y_train)
+            X = df.drop(columns=[target_col])
+            y = df[target_col]
 
-        preds = model_rf.predict(X_test)
-        acc = accuracy_score(y_test, preds)
+            X = pd.get_dummies(X)
+            scaler = StandardScaler()
+            X = scaler.fit_transform(X)
 
-        st.success(f"Random Forest Accuracy: {acc*100:.2f}%")
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
-        cm = confusion_matrix(y_test, preds)
-        fig8, ax8 = plt.subplots(figsize=(4,4))
-        sns.heatmap(cm, annot=True, fmt="d", ax=ax8)
-        st.pyplot(fig8)
+            model_rf = RandomForestClassifier()
+            model_rf.fit(X_train, y_train)
 
-    # =============================
-    # DEEP LEARNING
-    # =============================
-    st.subheader("🧠 Deep Learning Model")
+            preds = model_rf.predict(X_test)
+            acc = accuracy_score(y_test, preds)
 
-    if st.button("Train Deep Learning"):
+            st.success(f"Random Forest Accuracy: {acc*100:.2f}%")
 
-        X = df.drop(columns=[target_col])
-        y = df[target_col]
+            cm = confusion_matrix(y_test, preds)
+            fig8, ax8 = plt.subplots(figsize=(4,4))
+            sns.heatmap(cm, annot=True, fmt="d", ax=ax8)
+            st.pyplot(fig8)
 
-        X = pd.get_dummies(X)
-        scaler = StandardScaler()
-        X = scaler.fit_transform(X)
+        # DEEP LEARNING
+        if st.button("Train Deep Learning"):
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
+            X = df.drop(columns=[target_col])
+            y = df[target_col]
 
-        model = Sequential([
-            Dense(128, activation='relu'),
-            BatchNormalization(),
-            Dropout(0.3),
-            Dense(64, activation='relu'),
-            Dropout(0.2),
-            Dense(1, activation='sigmoid')
-        ])
+            X = pd.get_dummies(X)
+            scaler = StandardScaler()
+            X = scaler.fit_transform(X)
 
-        model.compile(optimizer='adam',
-                      loss='binary_crossentropy',
-                      metrics=['accuracy'])
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42
+            )
 
-        early_stop = EarlyStopping(patience=5, restore_best_weights=True)
+            model = Sequential([
+                Dense(128, activation='relu'),
+                BatchNormalization(),
+                Dropout(0.3),
+                Dense(64, activation='relu'),
+                Dropout(0.2),
+                Dense(1, activation='sigmoid')
+            ])
 
-        model.fit(X_train, y_train,
-                  epochs=50,
-                  validation_split=0.2,
-                  callbacks=[early_stop],
-                  verbose=0)
+            model.compile(
+                optimizer='adam',
+                loss='binary_crossentropy',
+                metrics=['accuracy']
+            )
 
-        loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
+            early_stop = EarlyStopping(patience=5, restore_best_weights=True)
 
-        st.success(f"Deep Learning Accuracy: {accuracy*100:.2f}%")
+            model.fit(
+                X_train, y_train,
+                epochs=50,
+                validation_split=0.2,
+                callbacks=[early_stop],
+                verbose=0
+            )
+
+            loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
+
+            st.success(f"Deep Learning Accuracy: {accuracy*100:.2f}%")
 
 else:
-    st.info("Please upload a CSV file to begin.")
+    st.info("Please upload a CSV file to start.")
