@@ -3,6 +3,6 @@ pandas
 numpy
 scikit-learn
 matplotlib
-joblib
 seaborn
+joblib
 tensorflow-cpu
