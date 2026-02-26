@@ -49,6 +49,7 @@ if uploaded_file:
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
 
+    # Detect binary vs multiclass
     target_type = "binary" if len(y.unique()) == 2 else "multiclass"
     numeric_data = X.select_dtypes(include=[np.number])
     categorical_data = X.select_dtypes(exclude=[np.number])
@@ -102,10 +103,14 @@ if uploaded_file:
             y_pred = np.random.randint(0, len(y.unique()), len(y))
             y_pred_prob = np.zeros(len(y))  # not used for multiclass
 
+    # Make sure target and predictions are same type (all strings) for confusion_matrix
+    y_str = y.astype(str)
+    y_pred_str = pd.Series(y_pred).astype(str)
+
     # Confusion Matrix
     with col4:
         st.subheader("Confusion Matrix")
-        cm = confusion_matrix(y, y_pred)
+        cm = confusion_matrix(y_str, y_pred_str)
         fig4, ax4 = plt.subplots(figsize=(3,3))
         sns.heatmap(cm, annot=True, fmt='d', cmap="Blues", ax=ax4)
         st.pyplot(fig4)
@@ -115,7 +120,8 @@ if uploaded_file:
         st.subheader("ROC Curve")
         fig5, ax5 = plt.subplots(figsize=(3,3))
         if target_type=="binary":
-            fpr, tpr, _ = roc_curve(y, y_pred_prob)
+            y_numeric = y.replace({y.unique()[0]:0, y.unique()[1]:1})
+            fpr, tpr, _ = roc_curve(y_numeric, y_pred_prob)
             roc_auc = auc(fpr, tpr)
             ax5.plot(fpr, tpr, color="#0F9D58")
             ax5.plot([0,1],[0,1],'r--')
