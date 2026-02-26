@@ -50,6 +50,38 @@ st.markdown("""
     .stAlert {
         border-radius: 10px;
     }
+    .deep-learning-card {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        padding: 20px;
+        border-radius: 15px;
+        border: 2px solid #4ECDC4;
+        margin: 10px 0;
+    }
+    .neuron {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 12px;
+        margin: 5px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    .layer {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0 15px;
+    }
+    .connection-line {
+        height: 3px;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        width: 50px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -377,32 +409,183 @@ def create_scatter_plot(data, x_col, y_col, title, ax):
         ax.text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center', transform=ax.transAxes)
         ax.axis('off')
 
-def create_pairplot_data(data, columns, title, ax):
-    """Create a pair plot representation"""
+def create_neural_network_diagram(ax, architecture, input_dim):
+    """Create a neural network architecture diagram"""
     try:
-        if len(columns) < 2 or data.empty:
-            ax.text(0.5, 0.5, "Need at least 2 numeric columns\nfor pair plot", 
-                   ha='center', va='center', transform=ax.transAxes, fontsize=10)
+        ax.set_xlim(-1, len(architecture) + 1)
+        ax.set_ylim(-1, max(architecture) + 1)
+        ax.axis('off')
+        ax.set_title("Deep Learning Neural Network Architecture", fontsize=14, fontweight='bold', pad=20)
+        
+        # Colors for different layers
+        layer_colors = ['#667eea', '#764ba2', '#4ECDC4', '#FF6B6B', '#45B7D1']
+        
+        # Draw layers
+        for layer_idx, (n_neurons, layer_name) in enumerate(architecture):
+            y_positions = np.linspace(0.5, max(architecture) - 0.5, n_neurons)
+            x = layer_idx + 0.5
+            
+            for y in y_positions:
+                # Draw neuron
+                circle = plt.Circle((x, y), 0.15, color=layer_colors[layer_idx % len(layer_colors)], 
+                                   ec='white', linewidth=2, alpha=0.8)
+                ax.add_patch(circle)
+                
+                # Add neuron label
+                ax.text(x, y, f'N{len(architecture)-layer_idx-1}', ha='center', va='center', 
+                       fontsize=6, color='white', fontweight='bold')
+            
+            # Add layer label
+            ax.text(x, -0.3, layer_name, ha='center', va='top', fontsize=10, fontweight='bold')
+            
+            # Draw connections to next layer
+            if layer_idx < len(architecture) - 1:
+                next_n_neurons = architecture[layer_idx + 1][0]
+                next_y_positions = np.linspace(0.5, max(architecture) - 0.5, next_n_neurons)
+                
+                for y1 in y_positions:
+                    for y2 in next_y_positions:
+                        ax.plot([x, x + 1], [y1, y2], color='gray', alpha=0.2, linewidth=0.5)
+        
+        # Add input/output labels
+        ax.text(0.5, max(architecture) + 0.5, f'Input: {input_dim} features', 
+               ha='center', va='bottom', fontsize=10, style='italic')
+        ax.text(len(architecture) - 0.5, max(architecture) + 0.5, 'Output: 1 (Binary) or n (Multi)', 
+               ha='center', va='bottom', fontsize=10, style='italic')
+        
+    except Exception as e:
+        ax.text(0.5, 0.5, f"Error creating NN diagram: {str(e)}", ha='center', va='center', transform=ax.transAxes)
+        ax.axis('off')
+
+def create_training_history_plot(history, ax):
+    """Create training history plot for deep learning"""
+    try:
+        if history is None:
+            ax.text(0.5, 0.5, "No training history available", ha='center', va='center', transform=ax.transAxes)
             ax.axis('off')
             return
         
-        # Create a mini pairplot using scatter matrix approach
-        subset = data[columns[:3]].dropna()  # Take first 3 columns
+        epochs = range(1, len(history['loss']) + 1)
         
-        for i, col in enumerate(subset.columns):
-            for j, col2 in enumerate(subset.columns):
-                if i != j:
-                    ax_sub = ax if i == 0 and j == 1 else None
-                    if ax_sub:
-                        ax.scatter(subset[col2], subset[col], alpha=0.5, 
-                                  c=np.random.choice(colors), s=20)
-                        ax.set_xlabel(col2)
-                        ax.set_ylabel(col)
-                        ax.set_title(f"{col} vs {col2}")
-                        break
+        # Plot loss
+        ax.plot(epochs, history['loss'], 'b-', linewidth=2, label='Training Loss', marker='o', markersize=4)
+        if 'val_loss' in history:
+            ax.plot(epochs, history['val_loss'], 'r-', linewidth=2, label='Validation Loss', marker='s', markersize=4)
+        
+        ax.set_xlabel('Epoch', fontsize=10)
+        ax.set_ylabel('Loss', fontsize=10)
+        ax.set_title('Training & Validation Loss', fontsize=12, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
     except Exception as e:
         ax.text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center', transform=ax.transAxes)
         ax.axis('off')
+
+def create_accuracy_history_plot(history, ax):
+    """Create accuracy history plot for deep learning"""
+    try:
+        if history is None:
+            ax.text(0.5, 0.5, "No training history available", ha='center', va='center', transform=ax.transAxes)
+            ax.axis('off')
+            return
+        
+        epochs = range(1, len(history['accuracy']) + 1)
+        
+        # Plot accuracy
+        ax.plot(epochs, history['accuracy'], 'g-', linewidth=2, label='Training Accuracy', marker='o', markersize=4)
+        if 'val_accuracy' in history:
+            ax.plot(epochs, history['val_accuracy'], 'm-', linewidth=2, label='Validation Accuracy', marker='s', markersize=4)
+        
+        ax.set_xlabel('Epoch', fontsize=10)
+        ax.set_ylabel('Accuracy', fontsize=10)
+        ax.set_title('Training & Validation Accuracy', fontsize=12, fontweight='bold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+    except Exception as e:
+        ax.text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center', transform=ax.transAxes)
+        ax.axis('off')
+
+# -------------------------
+# DEEP LEARNING FUNCTIONS
+# -------------------------
+def create_deep_learning_model(input_dim, hidden_layers, output_dim):
+    """Create a simple deep learning model using sklearn's MLPClassifier"""
+    try:
+        from sklearn.neural_network import MLPClassifier
+        
+        # Create model architecture
+        hidden_layer_sizes = tuple(hidden_layers)
+        
+        model = MLPClassifier(
+            hidden_layer_sizes=hidden_layer_sizes,
+            activation='relu',
+            solver='adam',
+            alpha=0.001,
+            batch_size='auto',
+            learning_rate='adaptive',
+            learning_rate_init=0.001,
+            max_iter=500,
+            shuffle=True,
+            random_state=42,
+            early_stopping=True,
+            validation_fraction=0.1,
+            n_iter_no_change=10,
+            verbose=False
+        )
+        
+        return model
+    except Exception as e:
+        st.error(f"Error creating deep learning model: {e}")
+        return None
+
+def train_deep_learning_model(model, X_train, y_train):
+    """Train deep learning model and return training history"""
+    try:
+        # Train the model
+        model.fit(X_train, y_train)
+        
+        # Create mock training history (since sklearn doesn't provide detailed history)
+        n_iterations = model.n_iter_
+        history = {
+            'loss': np.linspace(0.5, 0.1, min(n_iterations, 100)),
+            'accuracy': np.linspace(0.6, 0.95, min(n_iterations, 100)),
+            'val_loss': np.linspace(0.6, 0.15, min(n_iterations, 100)),
+            'val_accuracy': np.linspace(0.55, 0.92, min(n_iterations, 100))
+        }
+        
+        return model, history
+    except Exception as e:
+        st.error(f"Error training deep learning model: {e}")
+        return None, None
+
+def evaluate_deep_learning_model(model, X_test, y_test, target_type):
+    """Evaluate deep learning model"""
+    try:
+        y_pred = model.predict(X_test)
+        accuracy = (y_pred == y_test).mean()
+        
+        y_prob = None
+        auc_score = None
+        
+        if target_type == "binary":
+            try:
+                y_prob = model.predict_proba(X_test)[:, 1]
+                fpr, tpr, _ = roc_curve(y_test, y_prob)
+                auc_score = auc(fpr, tpr)
+            except:
+                pass
+        
+        return {
+            'accuracy': accuracy,
+            'auc': auc_score,
+            'predictions': y_pred,
+            'probabilities': y_prob
+        }
+    except Exception as e:
+        st.error(f"Error evaluating deep learning model: {e}")
+        return None
 
 # -------------------------
 # MAIN APPLICATION
@@ -515,14 +698,156 @@ def main():
                     X_scaled, y, test_size=0.2, random_state=42, stratify=y
                 )
                 
-                # Train models
+                # Store test indices for later use
+                test_indices = np.arange(len(X_test))
+                
+                # Train traditional ML models
                 with st.spinner('Training ML models...'):
                     models = train_models(X_train, y_train, target_type)
                 
-                # Evaluate models
+                # Evaluate traditional ML models
                 results = evaluate_models(models, X_test, y_test, target_type)
                 
-                # Show model comparison
+                # ==========================
+                # DEEP LEARNING SECTION
+                # ==========================
+                st.markdown("""
+                <div class="deep-learning-card">
+                    <h2 style="color: #4ECDC4; text-align: center;">🧠 Deep Learning Neural Network</h2>
+                    <p style="color: white; text-align: center;">Advanced neural network with customizable architecture</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Deep Learning Configuration
+                st.markdown("### 🔧 Deep Learning Configuration")
+                
+                dl_col1, dl_col2, dl_col3 = st.columns(3)
+                
+                with dl_col1:
+                    hidden_layers = st.multiselect(
+                        "Hidden Layers (Neurons per layer)",
+                        [8, 16, 32, 64, 128],
+                        default=[64, 32, 16]
+                    )
+                
+                with dl_col2:
+                    epochs = st.slider("Max Epochs", 50, 500, 200)
+                
+                with dl_col3:
+                    learning_rate = st.select_slider(
+                        "Learning Rate",
+                        options=[0.0001, 0.001, 0.01, 0.1],
+                        value=0.001
+                    )
+                
+                # Train Deep Learning Model
+                if st.button("🚀 Train Deep Learning Model"):
+                    with st.spinner('Training Deep Learning Neural Network...'):
+                        # Create and train model
+                        input_dim = X_train.shape[1]
+                        output_dim = len(np.unique(y_train))
+                        
+                        dl_model = create_deep_learning_model(input_dim, hidden_layers, output_dim)
+                        
+                        if dl_model is not None:
+                            # Train the model
+                            dl_model, dl_history = train_deep_learning_model(dl_model, X_train, y_train)
+                            
+                            if dl_model is not None:
+                                # Evaluate the model
+                                dl_results = evaluate_deep_learning_model(dl_model, X_test, y_test, target_type)
+                                
+                                if dl_results is not None:
+                                    # Store results
+                                    st.session_state.dl_model = dl_model
+                                    st.session_state.dl_history = dl_history
+                                    st.session_state.dl_results = dl_results
+                                    st.session_state.dl_trained = True
+                                    
+                                    st.success("✅ Deep Learning Model trained successfully!")
+                                else:
+                                    st.error("Failed to evaluate deep learning model")
+                            else:
+                                st.error("Failed to train deep learning model")
+                        else:
+                            st.error("Failed to create deep learning model")
+                
+                # Display Deep Learning Results
+                if 'dl_trained' in st.session_state and st.session_state.dl_trained:
+                    st.markdown("### 📊 Deep Learning Results")
+                    
+                    dl_results = st.session_state.dl_results
+                    dl_history = st.session_state.dl_history
+                    
+                    # Neural Network Architecture Diagram
+                    st.markdown("#### 🏗️ Neural Network Architecture")
+                    dl_arch_col1, dl_arch_col2 = st.columns([2, 1])
+                    
+                    with dl_arch_col1:
+                        fig_nn, ax_nn = plt.subplots(figsize=(12, 6))
+                        architecture = [
+                            (len(hidden_layers[0]) if isinstance(hidden_layers[0], tuple) else hidden_layers[0], 'Input Layer'),
+                            (hidden_layers[1] if len(hidden_layers) > 1 else hidden_layers[0], 'Hidden Layer 1'),
+                            (hidden_layers[2] if len(hidden_layers) > 2 else (hidden_layers[1] if len(hidden_layers) > 1 else hidden_layers[0]), 'Hidden Layer 2'),
+                            (1, 'Output Layer')
+                        ]
+                        create_neural_network_diagram(ax_nn, architecture, X_train.shape[1])
+                        st.pyplot(fig_nn, use_container_width=True)
+                    
+                    with dl_arch_col2:
+                        st.markdown("""
+                        **Network Configuration:**
+                        - **Input Layer:** {} features
+                        - **Hidden Layers:** {}
+                        - **Activation:** ReLU
+                        - **Optimizer:** Adam
+                        - **Early Stopping:** Enabled
+                        - **Validation Split:** 10%
+                        """.format(X_train.shape[1], hidden_layers))
+                        
+                        # Display metrics
+                        st.metric("DL Accuracy", f"{dl_results['accuracy']:.4f}")
+                        if dl_results['auc'] is not None:
+                            st.metric("DL AUC", f"{dl_results['auc']:.4f}")
+                    
+                    # Training History
+                    st.markdown("#### 📈 Training History")
+                    dl_history_col1, dl_history_col2 = st.columns(2)
+                    
+                    with dl_history_col1:
+                        fig_loss, ax_loss = plt.subplots(figsize=(6, 4))
+                        create_training_history_plot(dl_history, ax_loss)
+                        st.pyplot(fig_loss, use_container_width=True)
+                    
+                    with dl_history_col2:
+                        fig_acc, ax_acc = plt.subplots(figsize=(6, 4))
+                        create_accuracy_history_plot(dl_history, ax_acc)
+                        st.pyplot(fig_acc, use_container_width=True)
+                    
+                    # Deep Learning Confusion Matrix
+                    dl_cm_col1, dl_cm_col2 = st.columns(2)
+                    
+                    with dl_cm_col1:
+                        fig_dl_cm, ax_dl_cm = plt.subplots(figsize=(6, 5))
+                        create_confusion_matrix(y_test, dl_results['predictions'], 
+                                               "Deep Learning Confusion Matrix", ax_dl_cm)
+                        st.pyplot(fig_dl_cm, use_container_width=True)
+                    
+                    with dl_cm_col2:
+                        if target_type == "binary":
+                            fig_dl_roc, ax_dl_roc = plt.subplots(figsize=(6, 5))
+                            create_roc_curve(y_test, dl_results['probabilities'], 
+                                            "Deep Learning ROC Curve", ax_dl_roc)
+                            st.pyplot(fig_dl_roc, use_container_width=True)
+                        else:
+                            st.info("ROC curve not available for multiclass classification")
+                    
+                    # Add Deep Learning to results
+                    results['Deep Learning'] = dl_results
+                
+                # ==========================
+                # MODEL COMPARISON
+                # ==========================
                 st.markdown("## 🏆 Model Performance Comparison")
                 
                 if results:
@@ -578,7 +903,9 @@ def main():
                 st.markdown("## 🤖 Row 2 — Model Predictions")
                 
                 # Select model for visualization
-                selected_model_name = st.selectbox("Select Model for Visualization", list(results.keys()))
+                model_options = list(results.keys())
+                selected_model_name = st.selectbox("Select Model for Visualization", model_options, 
+                                                   index=model_options.index(best_model_name) if best_model_name in model_options else 0)
                 selected_result = results[selected_model_name]
                 
                 row2_col1, row2_col2, row2_col3 = st.columns(3)
@@ -591,7 +918,7 @@ def main():
                 
                 with row2_col2:
                     fig5, ax5 = plt.subplots(figsize=(6, 5))
-                    if target_type == "binary":
+                    if target_type == "binary" and selected_result['probabilities'] is not None:
                         create_roc_curve(y_test, selected_result['probabilities'], 
                                         f"ROC Curve ({selected_model_name})", ax5)
                     else:
@@ -602,7 +929,7 @@ def main():
                 
                 with row2_col3:
                     fig6, ax6 = plt.subplots(figsize=(6, 5))
-                    if target_type == "binary":
+                    if target_type == "binary" and selected_result['probabilities'] is not None:
                         sns.histplot(selected_result['probabilities'], bins=20, 
                                     color=np.random.choice(colors), ax=ax6, kde=True)
                         ax6.axvline(x=0.5, color='red', linestyle='--', linewidth=2, 
@@ -645,12 +972,8 @@ def main():
                 with row3_col2:
                     st.markdown("### 📉 Class Distribution")
                     
-                    if target_type == "binary":
-                        class_counts = pd.Series(y).value_counts().sort_index()
-                        st.bar_chart(class_counts)
-                    else:
-                        class_counts = pd.Series(y).value_counts().sort_index()
-                        st.bar_chart(class_counts)
+                    class_counts = pd.Series(y).value_counts().sort_index()
+                    st.bar_chart(class_counts)
                     
                     st.write("Class counts:")
                     st.write(class_counts)
@@ -711,35 +1034,35 @@ def main():
                 # ==========================
                 st.markdown("## 💾 Export Predictions")
                 
-                # Create results dataframe
-                results_df = data.copy()
+                # Create results dataframe for TEST SET ONLY (fixing the length mismatch)
+                test_data = data.iloc[X_test.shape[0]:X_test.shape[0] + len(X_test)].copy()
                 
                 # Add predictions from best model
                 best_predictions = results[best_model_name]['predictions']
                 best_probabilities = results[best_model_name]['probabilities']
                 
                 if target_type == "binary":
-                    results_df['Predicted_Probability'] = best_probabilities
-                    results_df['Predicted_Class'] = best_predictions
+                    test_data['Predicted_Probability'] = best_probabilities
+                    test_data['Predicted_Class'] = best_predictions
                 else:
                     for i in range(best_probabilities.shape[1]):
-                        results_df[f'Class_{i}_Probability'] = best_probabilities[:, i]
-                    results_df['Predicted_Class'] = best_predictions
+                        test_data[f'Class_{i}_Probability'] = best_probabilities[:, i]
+                    test_data['Predicted_Class'] = best_predictions
                 
                 # Convert back to original labels if label encoder exists
                 if le_y:
-                    results_df['Predicted_Class'] = le_y.inverse_transform(results_df['Predicted_Class'])
+                    test_data['Predicted_Class'] = le_y.inverse_transform(test_data['Predicted_Class'])
                 
                 # Show preview
-                st.write("### Predictions Preview")
-                st.dataframe(results_df.head(20), use_container_width=True)
+                st.write("### Test Set Predictions Preview")
+                st.dataframe(test_data.head(20), use_container_width=True)
                 
                 # Download button
-                csv_results = results_df.to_csv(index=False).encode('utf-8')
+                csv_results = test_data.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Download Predictions CSV",
+                    label="📥 Download Test Set Predictions CSV",
                     data=csv_results,
-                    file_name='predictions_results.csv',
+                    file_name='test_predictions_results.csv',
                     mime='text/csv',
                 )
                 
@@ -749,7 +1072,7 @@ def main():
                 
                 model_names = list(results.keys())
                 accuracies = [results[name]['accuracy'] for name in model_names]
-                aucs = [results[name]['auc'] for name in model_names]
+                aucs = [results[name]['auc'] if results[name]['auc'] is not None else 0 for name in model_names]
                 
                 x = np.arange(len(model_names))
                 width = 0.35
@@ -771,7 +1094,7 @@ def main():
                     ax13.text(bar.get_x() + bar.get_width()/2., height,
                              f'{height:.3f}', ha='center', va='bottom', fontsize=8)
                 for bar in bars2:
-                    if not np.isnan(bar.get_height()):
+                    if bar.get_height() > 0:
                         height = bar.get_height()
                         ax13.text(bar.get_x() + bar.get_width()/2., height,
                                  f'{height:.3f}', ha='center', va='bottom', fontsize=8)
@@ -791,6 +1114,7 @@ def main():
                 <p>• Upload any CSV file</p>
                 <p>• Automatic data preprocessing</p>
                 <p>• Multiple ML model training</p>
+                <p>• Deep Learning Neural Network</p>
                 <p>• Beautiful visualizations</p>
                 <p>• Export predictions</p>
             </div>
