@@ -1,231 +1,168 @@
+# -------------------------------
+# STREAMLIT ML DASHBOARD
+# -------------------------------
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.metrics import confusion_matrix, roc_curve, auc
+from tensorflow.keras.models import load_model
 
-st.set_page_config(page_title="Complete AI Dashboard", layout="wide")
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
+st.set_page_config(page_title="ML Prediction Dashboard", layout="wide")
+st.title("📊 ML Prediction Dashboard — Colorful & Smart")
 
-st.title("🔥 Complete Universal AI Dashboard")
+# Use Google-style colors
+sns.set_theme(style="whitegrid")
+colors = ["#FF4C4C", "#4285F4", "#0F9D58", "#F4B400", "#AB47BC"]
 
-uploaded_file = st.file_uploader("Upload CSV File", type=["csv"])
+# --------------------------------------------------
+# LOAD MODEL
+# --------------------------------------------------
+try:
+    model = load_model("churn_model.h5")
+except Exception as e:
+    st.warning("⚠️ Model file 'churn_model.h5' not found. Upload your model in the same folder.")
+
+# --------------------------------------------------
+# FILE UPLOADER
+# --------------------------------------------------
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
 if uploaded_file is not None:
+    data = pd.read_csv(uploaded_file)
+    st.subheader("Dataset Preview")
+    st.dataframe(data.head())
 
-    df = pd.read_csv(uploaded_file)
-    st.success("File Uploaded Successfully ✅")
-    st.dataframe(df.head())
+    # --------------------------------------------------
+    # TARGET COLUMN SELECTION
+    # --------------------------------------------------
+    target_column = st.selectbox(
+        "Choose the target column (what you want to predict)",
+        data.columns
+    )
 
-    categorical_cols = df.select_dtypes(include=["object"]).columns.tolist()
-    numeric_cols = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
+    # Fill missing values
+    data = data.fillna(0)
 
-    tab1, tab2, tab3 = st.tabs(["📊 Basic Diagrams", "📈 Advanced Diagrams", "🤖 Models"])
+    # Encode categorical variables
+    le = LabelEncoder()
+    for col in data.columns:
+        if data[col].dtype == 'object':
+            data[col] = le.fit_transform(data[col].astype(str))
 
-    # ======================================
-    # TAB 1 → BASIC DIAGRAMS (3 PER ROW)
-    # ======================================
-    with tab1:
+    # Features & Target
+    X = data.drop(target_column, axis=1)
+    y = data[target_column]
 
-        # -------- ROW 1 --------
+    # Standardize
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # --------------------------------------------------
+    # MODEL PREDICTION
+    # --------------------------------------------------
+    try:
+        y_pred_prob = model.predict(X_scaled).flatten()
+        y_pred = (y_pred_prob > 0.5).astype(int)
+
+        cm = confusion_matrix(y, y_pred)
+        fpr, tpr, _ = roc_curve(y, y_pred_prob)
+        roc_auc = auc(fpr, tpr)
+
+        numeric_data = data.select_dtypes(include=[np.number]).fillna(0)
+
+        # --------------------------
+        # ROW 1 — DATA INSIGHTS
+        # --------------------------
+        st.header("📊 Row 1 — Data Insights")
         col1, col2, col3 = st.columns(3)
 
-        # PIE
+        # Target Distribution (Pie Chart)
         with col1:
-            if categorical_cols:
-                st.subheader("🥧 Pie Chart")
-                col_pie = st.selectbox("Pie Column", categorical_cols, key="pie")
-                values = df[col_pie].value_counts()
-                fig1, ax1 = plt.subplots(figsize=(3,3))
-                ax1.pie(values, labels=values.index, autopct='%1.1f%%')
-                st.pyplot(fig1)
+            st.subheader("Target Distribution")
+            counts = y.value_counts()
+            fig1, ax1 = plt.subplots(figsize=(3,3))
+            ax1.pie(counts, labels=counts.index, colors=colors[:len(counts)], autopct='%1.1f%%')
+            st.pyplot(fig1)
 
-        # DONUT
+        # Feature Correlation
         with col2:
-            if categorical_cols:
-                st.subheader("🍩 Donut Chart")
-                col_donut = st.selectbox("Donut Column", categorical_cols, key="donut")
-                values2 = df[col_donut].value_counts()
+            st.subheader("Feature Correlation")
+            if not numeric_data.empty:
                 fig2, ax2 = plt.subplots(figsize=(3,3))
-                ax2.pie(values2, labels=values2.index, autopct='%1.1f%%')
-                centre_circle = plt.Circle((0, 0), 0.70, fc='white')
-                fig2.gca().add_artist(centre_circle)
+                sns.heatmap(numeric_data.corr(), cmap="coolwarm", ax=ax2)
                 st.pyplot(fig2)
+            else:
+                st.warning("No numeric columns available for correlation.")
 
-        # 3D PIE
+        # Prediction Probability Distribution
         with col3:
-            if categorical_cols:
-                st.subheader("🎨 3D Pie")
-                col_3d = st.selectbox("3D Pie Column", categorical_cols, key="3d")
-                values3d = df[col_3d].value_counts()
-                explode = [0.05] * len(values3d)
-                fig3d, ax3d = plt.subplots(figsize=(3,3))
-                ax3d.pie(values3d, labels=values3d.index,
-                         autopct='%1.1f%%', shadow=True, explode=explode)
-                st.pyplot(fig3d)
+            st.subheader("Prediction Probability")
+            fig3, ax3 = plt.subplots(figsize=(3,3))
+            sns.histplot(y_pred_prob, kde=True, color="#4285F4", ax=ax3)
+            st.pyplot(fig3)
 
-        # -------- ROW 2 --------
+        # --------------------------
+        # ROW 2 — MODEL PERFORMANCE
+        # --------------------------
+        st.header("🤖 Row 2 — Model Performance")
         col4, col5, col6 = st.columns(3)
 
-        # HISTOGRAM
+        # Confusion Matrix
         with col4:
-            if numeric_cols:
-                st.subheader("📊 Histogram")
-                col_hist = st.selectbox("Histogram Column", numeric_cols, key="hist")
-                fig4, ax4 = plt.subplots(figsize=(3,3))
-                sns.histplot(df[col_hist], kde=True, ax=ax4)
-                st.pyplot(fig4)
+            st.subheader("Confusion Matrix")
+            fig4, ax4 = plt.subplots(figsize=(3,3))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax4)
+            st.pyplot(fig4)
 
-        # BOX
+        # ROC Curve
         with col5:
-            if numeric_cols:
-                st.subheader("📦 Box Plot")
-                col_box = st.selectbox("Box Column", numeric_cols, key="box")
-                fig5, ax5 = plt.subplots(figsize=(3,3))
-                sns.boxplot(y=df[col_box], ax=ax5)
-                st.pyplot(fig5)
+            st.subheader("ROC Curve")
+            fig5, ax5 = plt.subplots(figsize=(3,3))
+            ax5.plot(fpr, tpr, color="#0F9D58")
+            ax5.plot([0,1],[0,1],'r--')
+            ax5.set_title(f"AUC = {roc_auc:.2f}")
+            st.pyplot(fig5)
 
-        # LINE
+        # Actual vs Predicted
         with col6:
-            if numeric_cols:
-                st.subheader("📈 Line Chart")
-                col_line = st.selectbox("Line Column", numeric_cols, key="line")
-                fig6, ax6 = plt.subplots(figsize=(3,3))
-                ax6.plot(df[col_line])
-                st.pyplot(fig6)
+            st.subheader("Actual vs Predicted")
+            comparison_df = pd.DataFrame({"Actual": y.values, "Predicted": y_pred})
+            st.dataframe(comparison_df.head())
 
-        # -------- ROW 3 --------
+        # --------------------------
+        # ROW 3 — EXTRA INSIGHTS
+        # --------------------------
+        st.header("📈 Row 3 — Extra Insights")
         col7, col8, col9 = st.columns(3)
 
-        # CIRCULAR BAR
+        # Positive Class %
         with col7:
-            if categorical_cols:
-                st.subheader("🌀 Circular Bar")
-                col_circ = st.selectbox("Circular Column", categorical_cols, key="circular")
-                values4 = df[col_circ].value_counts()
-                angles = np.linspace(0, 2*np.pi, len(values4), endpoint=False)
-                fig7 = plt.figure(figsize=(3,3))
-                ax7 = fig7.add_subplot(111, polar=True)
-                ax7.bar(angles, values4.values)
-                ax7.set_xticks(angles)
-                ax7.set_xticklabels(values4.index)
-                st.pyplot(fig7)
+            st.subheader("Positive Class %")
+            positive_rate = (y.sum() / len(y)) * 100 if y.sum() != 0 else 0
+            st.metric("Positive Class %", f"{positive_rate:.2f}%")
 
-        # HEATMAP
+        # Total Records
         with col8:
-            if len(numeric_cols) > 1:
-                st.subheader("🔥 Heatmap")
-                fig8, ax8 = plt.subplots(figsize=(3,3))
-                sns.heatmap(df[numeric_cols].corr(),
-                            annot=True, cmap="coolwarm", ax=ax8)
-                st.pyplot(fig8)
+            st.subheader("Total Records")
+            st.metric("Total Records", len(data))
 
-        # EMPTY SPACE (kept for alignment)
+        # Feature Value Counts (first numeric or categorical)
         with col9:
-            st.write("")
-
-    # ======================================
-    # TAB 2 → ADVANCED DIAGRAMS (UNCHANGED)
-    # ======================================
-    with tab2:
-
-        col10, col11 = st.columns(2)
-
-        with col10:
-            st.subheader("📈 Line Chart (Streamlit)")
-            if numeric_cols:
-                col_line2 = st.selectbox("Line Column", numeric_cols, key="line2")
-                st.line_chart(df[col_line2])
-
-        with col11:
-            st.subheader("🌀 Circular Bar Plot")
-            if categorical_cols:
-                col_circ2 = st.selectbox("Circular Column", categorical_cols, key="circular2")
-                values5 = df[col_circ2].value_counts()
-                angles = np.linspace(0, 2*np.pi, len(values5), endpoint=False)
-                fig9 = plt.figure(figsize=(3,3))
-                ax9 = fig9.add_subplot(111, polar=True)
-                ax9.bar(angles, values5.values)
-                ax9.set_xticks(angles)
-                ax9.set_xticklabels(values5.index)
+            st.subheader("Feature Value Counts")
+            if not data.empty:
+                feature = data.columns[0]
+                counts = data[feature].value_counts()
+                fig9, ax9 = plt.subplots(figsize=(3,3))
+                ax9.bar(counts.index, counts.values, color="#F4B400")
+                ax9.set_xticklabels(counts.index, rotation=45)
                 st.pyplot(fig9)
 
-    # ======================================
-    # TAB 3 → MODEL (UNCHANGED)
-    # ======================================
-    with tab3:
-
-        st.subheader("🤖 Universal Smart Model")
-
-        target_col = st.selectbox("Select Target Column", df.columns)
-
-        if st.button("Train Model"):
-
-            df_model = df.copy()
-
-            for col in df_model.columns:
-                if df_model[col].nunique() == len(df_model):
-                    df_model.drop(columns=[col], inplace=True)
-
-            if target_col not in df_model.columns:
-                st.error("Selected target looks like ID column.")
-            else:
-
-                X = df_model.drop(columns=[target_col])
-                y = df_model[target_col]
-
-                if y.dtype == "object":
-                    y = pd.factorize(y)[0]
-
-                X = pd.get_dummies(X)
-
-                scaler = StandardScaler()
-                X = scaler.fit_transform(X)
-
-                X_train, X_test, y_train, y_test = train_test_split(
-                    X, y, test_size=0.2, random_state=42
-                )
-
-                num_classes = len(np.unique(y))
-
-                if num_classes == 2:
-                    output_units = 1
-                    activation = "sigmoid"
-                    loss_function = "binary_crossentropy"
-                else:
-                    output_units = num_classes
-                    activation = "softmax"
-                    loss_function = "sparse_categorical_crossentropy"
-
-                model = Sequential([
-                    Dense(128, activation='relu'),
-                    BatchNormalization(),
-                    Dropout(0.3),
-                    Dense(64, activation='relu'),
-                    Dropout(0.2),
-                    Dense(output_units, activation=activation)
-                ])
-
-                model.compile(
-                    optimizer='adam',
-                    loss=loss_function,
-                    metrics=['accuracy']
-                )
-
-                model.fit(
-                    X_train, y_train,
-                    epochs=30,
-                    validation_split=0.2,
-                    verbose=0
-                )
-
-                loss, accuracy = model.evaluate(X_test, y_test, verbose=0)
-
-                st.success(f"Model Accuracy: {accuracy*100:.2f}%")
-
-else:
-    st.info("Upload a CSV file to start.")
+    except Exception as e:
+        st.error(f"Model prediction failed. Check dataset vs training features. Error: {e}")
