@@ -413,7 +413,11 @@ def create_neural_network_diagram(ax, architecture, input_dim):
     """Create a neural network architecture diagram"""
     try:
         ax.set_xlim(-1, len(architecture) + 1)
-        ax.set_ylim(-1, max(architecture) + 1)
+        
+        # ✅ FIX: get max neurons correctly
+        max_neurons = max([layer[0] for layer in architecture])
+        ax.set_ylim(-1, max_neurons + 1)
+        
         ax.axis('off')
         ax.set_title("Deep Learning Neural Network Architecture", fontsize=14, fontweight='bold', pad=20)
         
@@ -422,39 +426,76 @@ def create_neural_network_diagram(ax, architecture, input_dim):
         
         # Draw layers
         for layer_idx, (n_neurons, layer_name) in enumerate(architecture):
-            y_positions = np.linspace(0.5, max(architecture) - 0.5, n_neurons)
+            
+            # ✅ FIX: use max_neurons instead of max(architecture)
+            y_positions = np.linspace(0.5, max_neurons - 0.5, n_neurons)
             x = layer_idx + 0.5
             
             for y in y_positions:
                 # Draw neuron
-                circle = plt.Circle((x, y), 0.15, color=layer_colors[layer_idx % len(layer_colors)], 
-                                   ec='white', linewidth=2, alpha=0.8)
+                circle = plt.Circle(
+                    (x, y), 0.15,
+                    color=layer_colors[layer_idx % len(layer_colors)],
+                    ec='white', linewidth=2, alpha=0.8
+                )
                 ax.add_patch(circle)
                 
                 # Add neuron label
-                ax.text(x, y, f'N{len(architecture)-layer_idx-1}', ha='center', va='center', 
-                       fontsize=6, color='white', fontweight='bold')
+                ax.text(
+                    x, y,
+                    f'N{len(architecture)-layer_idx-1}',
+                    ha='center', va='center',
+                    fontsize=6, color='white', fontweight='bold'
+                )
             
-            # Add layer label
-            ax.text(x, -0.3, layer_name, ha='center', va='top', fontsize=10, fontweight='bold')
+            # Layer label
+            ax.text(
+                x, -0.3,
+                layer_name,
+                ha='center', va='top',
+                fontsize=10, fontweight='bold'
+            )
             
-            # Draw connections to next layer
+            # Draw connections
             if layer_idx < len(architecture) - 1:
                 next_n_neurons = architecture[layer_idx + 1][0]
-                next_y_positions = np.linspace(0.5, max(architecture) - 0.5, next_n_neurons)
+                
+                # ✅ FIX here also
+                next_y_positions = np.linspace(0.5, max_neurons - 0.5, next_n_neurons)
                 
                 for y1 in y_positions:
                     for y2 in next_y_positions:
-                        ax.plot([x, x + 1], [y1, y2], color='gray', alpha=0.2, linewidth=0.5)
+                        ax.plot(
+                            [x, x + 1],
+                            [y1, y2],
+                            color='gray',
+                            alpha=0.2,
+                            linewidth=0.5
+                        )
         
-        # Add input/output labels
-        ax.text(0.5, max(architecture) + 0.5, f'Input: {input_dim} features', 
-               ha='center', va='bottom', fontsize=10, style='italic')
-        ax.text(len(architecture) - 0.5, max(architecture) + 0.5, 'Output: 1 (Binary) or n (Multi)', 
-               ha='center', va='bottom', fontsize=10, style='italic')
+        # Labels
+        ax.text(
+            0.5, max_neurons + 0.5,
+            f'Input: {input_dim} features',
+            ha='center', va='bottom',
+            fontsize=10, style='italic'
+        )
+        
+        ax.text(
+            len(architecture) - 0.5,
+            max_neurons + 0.5,
+            'Output: 1 (Binary) or n (Multi)',
+            ha='center', va='bottom',
+            fontsize=10, style='italic'
+        )
         
     except Exception as e:
-        ax.text(0.5, 0.5, f"Error creating NN diagram: {str(e)}", ha='center', va='center', transform=ax.transAxes)
+        ax.text(
+            0.5, 0.5,
+            f"Error creating NN diagram: {str(e)}",
+            ha='center', va='center',
+            transform=ax.transAxes
+        )
         ax.axis('off')
 
 def create_training_history_plot(history, ax):
