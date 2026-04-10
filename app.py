@@ -103,14 +103,42 @@ def preprocess_data(data, target_column, feature_columns):
         X = data[feature_columns].copy()
         y = data[target_column].copy()
         
-        # Encode categorical features
+        # -------------------------
+        # 🔥 FIX START (NO UI CHANGE)
+        # -------------------------
+
+        # 1. Remove ID-like columns (like 0001-XXXX)
+        for col in X.columns:
+            if X[col].dtype == 'object' and X[col].nunique() == len(X):
+                X.drop(columns=[col], inplace=True)
+
+        # 2. Convert columns safely
         le_dict = {}
         for col in X.columns:
             if X[col].dtype == 'object' or X[col].dtype.name == 'category':
-                le = LabelEncoder()
-                X[col] = le.fit_transform(X[col].astype(str))
-                le_dict[col] = le
-        
+                try:
+                    # Try numeric conversion
+                    X[col] = pd.to_numeric(X[col], errors='coerce')
+
+                    # If too many NaN → categorical
+                    if X[col].isnull().mean() > 0.4:
+                        raise ValueError("Categorical column")
+
+                except:
+                    le = LabelEncoder()
+                    X[col] = le.fit_transform(X[col].astype(str))
+                    le_dict[col] = le
+
+        # 3. Fill missing values
+        X = X.fillna(X.mean(numeric_only=True))
+
+        # 4. Final safety (VERY IMPORTANT)
+        X = X.apply(pd.to_numeric, errors='coerce').fillna(0)
+
+        # -------------------------
+        # 🔥 FIX END
+        # -------------------------
+
         # Encode target if needed
         le_y = None
         if y.dtype == 'object' or y.dtype.name == 'category':
@@ -122,10 +150,10 @@ def preprocess_data(data, target_column, feature_columns):
         X_scaled = scaler.fit_transform(X)
         
         return X, y, X_scaled, le_y, scaler
+
     except Exception as e:
         st.error(f"Preprocessing error: {e}")
         return None, None, None, None, None
-
 def train_models(X_train, y_train, target_type):
     """Train multiple ML models"""
     models = {}
