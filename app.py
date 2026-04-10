@@ -106,14 +106,14 @@ def preprocess_data(data, target_column, feature_columns):
         # Encode categorical features
         le_dict = {}
         for col in X.columns:
-            if not pd.api.types.is_numeric_dtype(X[col]):
+            if X[col].dtype == 'object' or X[col].dtype.name == 'category':
                 le = LabelEncoder()
                 X[col] = le.fit_transform(X[col].astype(str))
                 le_dict[col] = le
         
         # Encode target if needed
         le_y = None
-        if not pd.api.types.is_numeric_dtype(y):
+        if y.dtype == 'object' or y.dtype.name == 'category':
             le_y = LabelEncoder()
             y = le_y.fit_transform(y.astype(str))
         
@@ -746,4 +746,441 @@ def main():
                 with st.spinner('Training ML models...'):
                     models = train_models(X_train, y_train, target_type)
                 
-                # 
+                # Evaluate traditional ML models
+                results = evaluate_models(models, X_test, y_test, target_type)
+                
+                # ==========================
+                # DEEP LEARNING SECTION
+                # ==========================
+                st.markdown("""
+                <div class="deep-learning-card">
+                    <h2 style="color: #4ECDC4; text-align: center;">🧠 Deep Learning Neural Network</h2>
+                    <p style="color: white; text-align: center;">Advanced neural network with customizable architecture</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Deep Learning Configuration
+                st.markdown("### 🔧 Deep Learning Configuration")
+                
+                dl_col1, dl_col2, dl_col3 = st.columns(3)
+                
+                with dl_col1:
+                    hidden_layers = st.multiselect(
+                        "Hidden Layers (Neurons per layer)",
+                        [8, 16, 32, 64, 128],
+                        default=[64, 32, 16]
+                    )
+                
+                with dl_col2:
+                    epochs = st.slider("Max Epochs", 50, 500, 200)
+                
+                with dl_col3:
+                    learning_rate = st.select_slider(
+                        "Learning Rate",
+                        options=[0.0001, 0.001, 0.01, 0.1],
+                        value=0.001
+                    )
+                
+                # Train Deep Learning Model
+                if st.button("🚀 Train Deep Learning Model"):
+                    with st.spinner('Training Deep Learning Neural Network...'):
+                        # Create and train model
+                        input_dim = X_train.shape[1]
+                        output_dim = len(np.unique(y_train))
+                        
+                        dl_model = create_deep_learning_model(input_dim, hidden_layers, output_dim)
+                        
+                        if dl_model is not None:
+                            # Train the model
+                            dl_model, dl_history = train_deep_learning_model(dl_model, X_train, y_train)
+                            
+                            if dl_model is not None:
+                                # Evaluate the model
+                                dl_results = evaluate_deep_learning_model(dl_model, X_test, y_test, target_type)
+                                
+                                if dl_results is not None:
+                                    # Store results
+                                    st.session_state.dl_model = dl_model
+                                    st.session_state.dl_history = dl_history
+                                    st.session_state.dl_results = dl_results
+                                    st.session_state.dl_trained = True
+                                    
+                                    st.success("✅ Deep Learning Model trained successfully!")
+                                else:
+                                    st.error("Failed to evaluate deep learning model")
+                            else:
+                                st.error("Failed to train deep learning model")
+                        else:
+                            st.error("Failed to create deep learning model")
+                
+                # Display Deep Learning Results
+                if 'dl_trained' in st.session_state and st.session_state.dl_trained:
+                    st.markdown("### 📊 Deep Learning Results")
+                    
+                    dl_results = st.session_state.dl_results
+                    dl_history = st.session_state.dl_history
+                    
+                    # Neural Network Architecture Diagram
+                    st.markdown("#### 🏗️ Neural Network Architecture")
+                    dl_arch_col1, dl_arch_col2 = st.columns([2, 1])
+                    
+                    with dl_arch_col1:
+                        fig_nn, ax_nn = plt.subplots(figsize=(12, 6))
+                        architecture = [
+                            (len(hidden_layers[0]) if isinstance(hidden_layers[0], tuple) else hidden_layers[0], 'Input Layer'),
+                            (hidden_layers[1] if len(hidden_layers) > 1 else hidden_layers[0], 'Hidden Layer 1'),
+                            (hidden_layers[2] if len(hidden_layers) > 2 else (hidden_layers[1] if len(hidden_layers) > 1 else hidden_layers[0]), 'Hidden Layer 2'),
+                            (1, 'Output Layer')
+                        ]
+                        create_neural_network_diagram(ax_nn, architecture, X_train.shape[1])
+                        st.pyplot(fig_nn, use_container_width=True)
+                    
+                    with dl_arch_col2:
+                        st.markdown("""
+                        **Network Configuration:**
+                        - **Input Layer:** {} features
+                        - **Hidden Layers:** {}
+                        - **Activation:** ReLU
+                        - **Optimizer:** Adam
+                        - **Early Stopping:** Enabled
+                        - **Validation Split:** 10%
+                        """.format(X_train.shape[1], hidden_layers))
+                        
+                        # Display metrics
+                        st.metric("DL Accuracy", f"{dl_results['accuracy']:.4f}")
+                        if dl_results['auc'] is not None:
+                            st.metric("DL AUC", f"{dl_results['auc']:.4f}")
+                    
+                    # Training History
+                    st.markdown("#### 📈 Training History")
+                    dl_history_col1, dl_history_col2 = st.columns(2)
+                    
+                    with dl_history_col1:
+                        fig_loss, ax_loss = plt.subplots(figsize=(6, 4))
+                        create_training_history_plot(dl_history, ax_loss)
+                        st.pyplot(fig_loss, use_container_width=True)
+                    
+                    with dl_history_col2:
+                        fig_acc, ax_acc = plt.subplots(figsize=(6, 4))
+                        create_accuracy_history_plot(dl_history, ax_acc)
+                        st.pyplot(fig_acc, use_container_width=True)
+                    
+                    # Deep Learning Confusion Matrix
+                    dl_cm_col1, dl_cm_col2 = st.columns(2)
+                    
+                    with dl_cm_col1:
+                        fig_dl_cm, ax_dl_cm = plt.subplots(figsize=(6, 5))
+                        create_confusion_matrix(y_test, dl_results['predictions'], 
+                                               "Deep Learning Confusion Matrix", ax_dl_cm)
+                        st.pyplot(fig_dl_cm, use_container_width=True)
+                    
+                    with dl_cm_col2:
+                        if target_type == "binary":
+                            fig_dl_roc, ax_dl_roc = plt.subplots(figsize=(6, 5))
+                            create_roc_curve(y_test, dl_results['probabilities'], 
+                                            "Deep Learning ROC Curve", ax_dl_roc)
+                            st.pyplot(fig_dl_roc, use_container_width=True)
+                        else:
+                            st.info("ROC curve not available for multiclass classification")
+                    
+                    # Add Deep Learning to results
+                    results['Deep Learning'] = dl_results
+                
+                # ==========================
+                # MODEL COMPARISON
+                # ==========================
+                st.markdown("## 🏆 Model Performance Comparison")
+                
+                if results:
+                    # Create comparison dataframe
+                    comparison_data = []
+                    for name, res in results.items():
+                        row = {'Model': name, 'Accuracy': res['accuracy']}
+                        if res['auc'] is not None:
+                            row['AUC'] = res['auc']
+                        comparison_data.append(row)
+                    
+                    comparison_df = pd.DataFrame(comparison_data)
+                    st.dataframe(comparison_df, use_container_width=True)
+                    
+                    # Best model
+                    best_model_name = max(results.keys(), 
+                                         key=lambda x: results[x]['accuracy'])
+                    st.success(f"🏆 Best Model: **{best_model_name}** with {results[best_model_name]['accuracy']:.2%} accuracy")
+                
+                # ==========================
+                # ROW 1 — DATA INSIGHTS
+                # ==========================
+                st.markdown("## 📊 Row 1 — Data Insights")
+                
+                row1_col1, row1_col2, row1_col3 = st.columns(3)
+                
+                with row1_col1:
+                    fig1, ax1 = plt.subplots(figsize=(6, 5))
+                    create_pie_chart(y, "Target Distribution", ax1)
+                    st.pyplot(fig1, use_container_width=True)
+                
+                with row1_col2:
+                    fig2, ax2 = plt.subplots(figsize=(6, 5))
+                    numeric_data = data.select_dtypes(include=[np.number])
+                    numeric_features = [col for col in feature_columns if col in numeric_data.columns]
+                    create_heatmap(data[numeric_features] if numeric_features else numeric_data, 
+                                  "Feature Correlation Heatmap", ax2)
+                    st.pyplot(fig2, use_container_width=True)
+                
+                with row1_col3:
+                    fig3, ax3 = plt.subplots(figsize=(6, 5))
+                    first_numeric = numeric_data.columns[0] if not numeric_data.empty else None
+                    if first_numeric:
+                        create_histogram(data, first_numeric, f"Distribution of {first_numeric}", ax3)
+                    else:
+                        ax3.text(0.5, 0.5, "No numeric features\navailable", ha='center', va='center')
+                        ax3.axis('off')
+                    st.pyplot(fig3, use_container_width=True)
+                
+                # ==========================
+                # ROW 2 — MODEL PREDICTIONS
+                # ==========================
+                st.markdown("## 🤖 Row 2 — Model Predictions")
+                
+                # Select model for visualization
+                model_options = list(results.keys())
+                selected_model_name = st.selectbox("Select Model for Visualization", model_options, 
+                                                   index=model_options.index(best_model_name) if best_model_name in model_options else 0)
+                selected_result = results[selected_model_name]
+                
+                row2_col1, row2_col2, row2_col3 = st.columns(3)
+                
+                with row2_col1:
+                    fig4, ax4 = plt.subplots(figsize=(6, 5))
+                    create_confusion_matrix(y_test, selected_result['predictions'], 
+                                           f"Confusion Matrix ({selected_model_name})", ax4)
+                    st.pyplot(fig4, use_container_width=True)
+                
+                with row2_col2:
+                    fig5, ax5 = plt.subplots(figsize=(6, 5))
+                    if target_type == "binary" and selected_result['probabilities'] is not None:
+                        create_roc_curve(y_test, selected_result['probabilities'], 
+                                        f"ROC Curve ({selected_model_name})", ax5)
+                    else:
+                        ax5.text(0.5, 0.5, "ROC Curve not available\nfor multiclass classification", 
+                                ha='center', va='center', fontsize=12)
+                        ax5.axis('off')
+                    st.pyplot(fig5, use_container_width=True)
+                
+                with row2_col3:
+                    fig6, ax6 = plt.subplots(figsize=(6, 5))
+                    if target_type == "binary" and selected_result['probabilities'] is not None:
+                        sns.histplot(selected_result['probabilities'], bins=20, 
+                                    color=np.random.choice(colors), ax=ax6, kde=True)
+                        ax6.axvline(x=0.5, color='red', linestyle='--', linewidth=2, 
+                                   label='Threshold (0.5)')
+                        ax6.set_xlabel('Prediction Probability', fontsize=10)
+                        ax6.set_ylabel('Count', fontsize=10)
+                        ax6.set_title(f"Prediction Distribution ({selected_model_name})", 
+                                     fontsize=12, fontweight='bold')
+                        ax6.legend()
+                    else:
+                        unique, counts = np.unique(selected_result['predictions'], return_counts=True)
+                        ax6.bar(unique.astype(str), counts, color=colors[:len(unique)])
+                        ax6.set_xlabel('Class', fontsize=10)
+                        ax6.set_ylabel('Count', fontsize=10)
+                        ax6.set_title(f"Class Distribution ({selected_model_name})", 
+                                     fontsize=12, fontweight='bold')
+                    st.pyplot(fig6, use_container_width=True)
+                
+                # ==========================
+                # ROW 3 — ADDITIONAL METRICS
+                # ==========================
+                st.markdown("## 📈 Row 3 — Additional Insights")
+                
+                row3_col1, row3_col2, row3_col3 = st.columns(3)
+                
+                with row3_col1:
+                    st.markdown("### 📊 Key Metrics")
+                    
+                    if target_type == "binary":
+                        positive_rate = (np.sum(y) / len(y)) * 100
+                        st.metric("Positive Class Rate", f"{positive_rate:.2f}%")
+                    else:
+                        st.metric("Number of Classes", len(np.unique(y)))
+                    
+                    st.metric("Total Records", len(data))
+                    st.metric("Features Used", len(feature_columns))
+                    st.metric("Training Samples", len(X_train))
+                    st.metric("Test Samples", len(X_test))
+                
+                with row3_col2:
+                    st.markdown("### 📉 Class Distribution")
+                    
+                    class_counts = pd.Series(y).value_counts().sort_index()
+                    st.bar_chart(class_counts)
+                    
+                    st.write("Class counts:")
+                    st.write(class_counts)
+                
+                with row3_col3:
+                    st.markdown("### 📊 Categorical Analysis")
+                    
+                    categorical_data = data.select_dtypes(exclude=[np.number])
+                    if not categorical_data.empty:
+                        cat_col = st.selectbox("Select Categorical Column", categorical_data.columns)
+                        
+                        fig9, ax9 = plt.subplots(figsize=(6, 5))
+                        create_bar_chart(data, cat_col, f"Top Categories: {cat_col}", ax9)
+                        st.pyplot(fig9, use_container_width=True)
+                    else:
+                        st.info("No categorical columns found in the dataset")
+                
+                # ==========================
+                # ROW 4 — FEATURE ANALYSIS
+                # ==========================
+                st.markdown("## 📉 Row 4 — Feature Analysis")
+                
+                # Select feature for analysis
+                numeric_features = list(data.select_dtypes(include=[np.number]).columns)
+                
+                if numeric_features:
+                    col_analysis1, col_analysis2 = st.columns(2)
+                    
+                    with col_analysis1:
+                        selected_feature = st.selectbox("Select Feature for Analysis", numeric_features)
+                        
+                        fig10, ax10 = plt.subplots(figsize=(7, 5))
+                        create_box_plot(data, selected_feature, f"Box Plot: {selected_feature}", ax10)
+                        st.pyplot(fig10, use_container_width=True)
+                    
+                    with col_analysis2:
+                        fig11, ax11 = plt.subplots(figsize=(7, 5))
+                        create_violin_plot(data, selected_feature, f"Violin Plot: {selected_feature}", ax11)
+                        st.pyplot(fig11, use_container_width=True)
+                    
+                    # Scatter plot
+                    if len(numeric_features) >= 2:
+                        col_scatter1, col_scatter2 = st.columns(2)
+                        
+                        with col_scatter1:
+                            x_feature = st.selectbox("X-axis Feature", numeric_features, index=0)
+                        
+                        with col_scatter2:
+                            y_feature = st.selectbox("Y-axis Feature", numeric_features, index=1 if len(numeric_features) > 1 else 0)
+                        
+                        fig12, ax12 = plt.subplots(figsize=(7, 5))
+                        create_scatter_plot(data, x_feature, y_feature, 
+                                           f"Scatter Plot: {x_feature} vs {y_feature}", ax12)
+                        st.pyplot(fig12, use_container_width=True)
+                
+                # ==========================
+                # ROW 5 — EXPORT RESULTS
+                # ==========================
+                st.markdown("## 💾 Export Predictions")
+                
+                # Create results dataframe for TEST SET ONLY (fixing the length mismatch)
+                test_data = data.iloc[X_test.shape[0]:X_test.shape[0] + len(X_test)].copy()
+                
+                # Add predictions from best model
+                best_predictions = results[best_model_name]['predictions']
+                best_probabilities = results[best_model_name]['probabilities']
+                
+                if target_type == "binary":
+                    test_data['Predicted_Probability'] = best_probabilities
+                    test_data['Predicted_Class'] = best_predictions
+                else:
+                    for i in range(best_probabilities.shape[1]):
+                        test_data[f'Class_{i}_Probability'] = best_probabilities[:, i]
+                    test_data['Predicted_Class'] = best_predictions
+                
+                # Convert back to original labels if label encoder exists
+                if le_y:
+                    test_data['Predicted_Class'] = le_y.inverse_transform(test_data['Predicted_Class'])
+                
+                # Show preview
+                st.write("### Test Set Predictions Preview")
+                st.dataframe(test_data.head(20), use_container_width=True)
+                
+                # Download button
+                csv_results = test_data.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Download Test Set Predictions CSV",
+                    data=csv_results,
+                    file_name='test_predictions_results.csv',
+                    mime='text/csv',
+                )
+                
+                # Model comparison chart
+                st.write("### Model Accuracy Comparison")
+                fig13, ax13 = plt.subplots(figsize=(10, 5))
+                
+                model_names = list(results.keys())
+                accuracies = [results[name]['accuracy'] for name in model_names]
+                aucs = [results[name]['auc'] if results[name]['auc'] is not None else 0 for name in model_names]
+                
+                x = np.arange(len(model_names))
+                width = 0.35
+                
+                bars1 = ax13.bar(x - width/2, accuracies, width, label='Accuracy', color='#4ECDC4')
+                bars2 = ax13.bar(x + width/2, aucs, width, label='AUC', color='#FF6B6B')
+                
+                ax13.set_xlabel('Model', fontsize=12)
+                ax13.set_ylabel('Score', fontsize=12)
+                ax13.set_title('Model Performance Comparison', fontsize=14, fontweight='bold')
+                ax13.set_xticks(x)
+                ax13.set_xticklabels(model_names, rotation=45, ha='right')
+                ax13.legend()
+                ax13.set_ylim([0, 1.1])
+                
+                # Add value labels
+                for bar in bars1:
+                    height = bar.get_height()
+                    ax13.text(bar.get_x() + bar.get_width()/2., height,
+                             f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+                for bar in bars2:
+                    if bar.get_height() > 0:
+                        height = bar.get_height()
+                        ax13.text(bar.get_x() + bar.get_width()/2., height,
+                                 f'{height:.3f}', ha='center', va='bottom', fontsize=8)
+                
+                st.pyplot(fig13, use_container_width=True)
+    
+    else:
+        # Show welcome message when no file is uploaded
+        st.markdown("""
+        <div style="text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 20px; margin: 20px 0;">
+            <h2 style="color: white;">👋 Welcome to AI ML Dashboard!</h2>
+            <p style="color: white; font-size: 18px;">
+                Please upload a CSV file from the sidebar to get started.
+            </p>
+            <div style="color: white; margin-top: 30px;">
+                <h4>📋 Supported Features:</h4>
+                <p>• Upload any CSV file</p>
+                <p>• Automatic data preprocessing</p>
+                <p>• Multiple ML model training</p>
+                <p>• Deep Learning Neural Network</p>
+                <p>• Beautiful visualizations</p>
+                <p>• Export predictions</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Show sample data structure
+        st.markdown("### 📊 Expected CSV Format")
+        st.info("Your CSV file should have:")
+        st.write("- One column for target variable (label)")
+        st.write("- One or more feature columns")
+        st.write("- Headers in the first row")
+        
+        # Create sample data
+        sample_data = pd.DataFrame({
+            'Age': [25, 30, 35, 40, 45, 50, 55, 60],
+            'Income': [50000, 60000, 75000, 80000, 90000, 100000, 110000, 120000],
+            'CreditScore': [650, 700, 720, 750, 780, 800, 820, 850],
+            'City': ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Phoenix', 'Philadelphia', 'San Antonio', 'San Diego'],
+            'Churn': ['No', 'No', 'Yes', 'No', 'Yes', 'No', 'Yes', 'No']
+        })
+        
+        st.markdown("### 📋 Sample Data Format")
+        st.dataframe(sample_data, use_container_width=True)
+
+# Run the application
+if __name__ == "__main__":
+    main()
